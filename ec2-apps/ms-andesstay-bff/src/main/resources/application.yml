@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: ms-andesstay-bff
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Azure AD (Entra ID): valida firma/emisor con el discovery del tenant.
+          issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0
+          # Audience esperado del token (App ID URI de la API en el App Registration).
+          audiences: api://${AZURE_API_CLIENT_ID}
+
+server:
+  port: 8080          # el BFF es la puerta de entrada (detras del API Gateway)
+
+# URLs de los micros. La clave = primer segmento de la ruta (/api/<clave>/...)
+gateway:
+  routes:
+    reservations: http://localhost:8081
+    units: http://localhost:8082
+    reports: http://localhost:8084
+    audit: http://localhost:8085
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
