@@ -10,21 +10,19 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update          # crea/actualiza tablas solo en desarrollo
-    open-in-view: false         # evita el anti-patrón OSIV (buena práctica)
+    open-in-view: false         # evita el anti-patron OSIV (buena practica)
     properties:
       hibernate:
         format_sql: true        # imprime el SQL ordenado y legible
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # --- Mensajería: se activa cuando montemos el paquete messaging/ ---
-  # Por ahora no hay listeners, así que el micro arranca sin Rabbit/Kafka.
-  # Los defaults ya apuntan a localhost; verás WARN de conexión hasta que
-  # esos servicios estén arriba (es inofensivo).
-  # rabbitmq:
-  #   host: localhost
-  #   port: 5672
-  # kafka:
-  #   bootstrap-servers: localhost:9092
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: andesstay
+    password: ${RABBIT_PASSWORD:andesstay}
+    publisher-confirm-type: correlated   # confirma que el broker recibio el mensaje
+    publisher-returns: true              # avisa si un mensaje no pudo enrutarse a ninguna cola
 
 server:
   port: 8081
@@ -35,8 +33,8 @@ management:
       exposure:
         include: health,info    # expone /actuator/health para los healthchecks
 
-# Muestra el SQL que ejecuta Hibernate (útil para aprender/debuggear)
+# Muestra el SQL que ejecuta Hibernate (util para aprender/debuggear)
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE   # además, los valores de los parámetros (?)
+    org.hibernate.orm.jdbc.bind: TRACE   # ademas, los valores de los parametros (?)
