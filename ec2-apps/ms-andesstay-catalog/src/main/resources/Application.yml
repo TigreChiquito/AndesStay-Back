@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: ms-andesstay-catalog
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/catalog_db
+    username: andesstay
+    password: ${DB_PASSWORD:andesstay}   # usa la env DB_PASSWORD si existe; si no, "andesstay"
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # crea/actualiza tablas solo en desarrollo
+    open-in-view: false         # evita el anti-patrón OSIV (buena práctica)
+    properties:
+      hibernate:
+        format_sql: true        # imprime el SQL ordenado y legible
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info    # expone /actuator/health para los healthchecks
+
+# Muestra el SQL que ejecuta Hibernate (útil para aprender/debuggear)
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE   # además, los valores de los parámetros (?)
