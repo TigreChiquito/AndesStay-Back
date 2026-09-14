@@ -10,23 +10,23 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogUnavailableException;
+import cl.tigrechiquito.ms_andesstay_reservations.client.UnitNotAvailableException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationNotFoundException;
 
 /**
- * Traduce las excepciones del dominio/validación a respuestas HTTP usando
- * ProblemDetail (RFC 7807), el formato estándar de errores en Spring 6+/Boot 4.
+ * Traduce las excepciones del dominio/validacion/integracion a respuestas HTTP
+ * usando ProblemDetail (RFC 7807).
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** Reserva inexistente -> 404. */
     @ExceptionHandler(ReservationNotFoundException.class)
     public ProblemDetail handleNotFound(ReservationNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    /** Transición de estado no permitida -> 409 Conflict. */
     @ExceptionHandler(InvalidReservationStatusTransitionException.class)
     public ProblemDetail handleInvalidTransition(InvalidReservationStatusTransitionException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
@@ -35,18 +35,27 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    /** Reglas de negocio simples (ej. checkOut <= checkIn) -> 400. */
+    /** Sin cupos en catalog al confirmar -> 409 Conflict. */
+    @ExceptionHandler(UnitNotAvailableException.class)
+    public ProblemDetail handleNoAvailability(UnitNotAvailableException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    /** catalog no responde -> 503 Service Unavailable. */
+    @ExceptionHandler(CatalogUnavailableException.class)
+    public ProblemDetail handleCatalogDown(CatalogUnavailableException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    /** Fallos de @Valid en el body -> 400 con el detalle por campo. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, "Payload inválido");
-
+                HttpStatus.BAD_REQUEST, "Payload invalido");
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(fieldError -> errors.put(fieldError.getField(), fieldError.getDefaultMessage()));
@@ -54,10 +63,9 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    /** JSON ilegible o valor de enum inválido (ej. un status inexistente) -> 400. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "JSON inválido o valor no permitido (revisa el campo 'status').");
+                "JSON invalido o valor no permitido (revisa el campo 'status').");
     }
 }

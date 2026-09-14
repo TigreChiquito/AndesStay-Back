@@ -3,28 +3,42 @@ package cl.tigrechiquito.ms_andesstay_reservations.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogClient;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
-import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationNotFoundException;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.CreateReservationRequest;
+import cl.tigrechiquito.ms_andesstay_reservations.messaging.ReservationCreatedEvent;
+import cl.tigrechiquito.ms_andesstay_reservations.messaging.ReservationStatusChangedEvent;
 import cl.tigrechiquito.ms_andesstay_reservations.repository.ReservationRepository;
 
 /**
- * Orquesta los casos de uso de reservas. La validación de la máquina de estados
- * NO vive aquí, sino dentro de la entidad ({@code Reservation.changeStatusTo}).
- * Este servicio se encarga de la persistencia, las reglas de aplicación y
- * (más adelante) de emitir los eventos/comandos de mensajería.
+ * Orquesta los casos de uso de reservas. La maquina de estados vive en la entidad;
+ * este servicio coordina persistencia, mensajeria (eventos AFTER_COMMIT) y la
+ * integracion sincrona con catalog para la disponibilidad de cupos.
  */
 @Service
 public class ReservationService {
 
-    private final ReservationRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
 
-    public ReservationService(ReservationRepository repository) {
+    private final ReservationRepository repository;
+    private final ApplicationEventPublisher events;
+    private final CatalogClient catalogClient;
+
+    public ReservationService(ReservationRepository repository,
+                              ApplicationEventPublisher events,
+                              CatalogClient catalogClient) {
         this.repository = repository;
+        this.events = events;
+        this.catalogClient = catalogClient;
     }
 
     @Transactional
@@ -43,8 +57,8 @@ public class ReservationService {
 
         Reservation saved = repository.save(reservation);
 
-        // TODO (mensajería): publicar evento "reservation.created" en Kafka
-        //   (tópico reservations.events) para alimentar auditoría y reportería.
+        // El KafkaEventListener emite "reservation.created" a Kafka AFTER_COMMIT.
+        events.publishEvent(new ReservationCreatedEvent(saved));
         return saved;
     }
 
@@ -57,19 +71,36 @@ public class ReservationService {
     @Transactional
     public Reservation changeStatus(Long id, ReservationStatus target) {
         Reservation reservation = getById(id);
+        ReservationStatus current = reservation.getStatus();
 
-        // La entidad valida la transición y lanza
-        // InvalidReservationStatusTransitionException si no corresponde.
-        reservation.changeStatusTo(target);
+        // 1. Validar la transicion ANTES de tocar catalog (no reservar cupo en vano).
+        if (target != current && !current.canTransitionTo(target)) {
+            throw new InvalidReservationStatusTransitionException(current, target);
+        }
 
-        Reservation saved = repository.save(reservation);
+        // 2. Coordinar disponibilidad con catalog (sincrono).
+        //    Confirmar descuenta un cupo; si no hay, catalog responde 409 y abortamos.
+        boolean slotReserved = false;
+        if (target == ReservationStatus.CONFIRMADA && current != ReservationStatus.CONFIRMADA) {
+            catalogClient.reserveSlot(reservation.getUnitId());
+            slotReserved = true;
+        } else if (releasesSlot(current, target)) {
+            catalogClient.releaseSlot(reservation.getUnitId());
+        }
 
-        // TODO (mensajería):
-        //  - publicar el cambio de estado en Kafka (reservations.events).
-        //  - si target == CONFIRMADA -> encolar email de confirmación + voucher (RabbitMQ).
-        //  - si target == CHECKIN_PENDIENTE/EN_ESTADIA -> ticket de housekeeping (RabbitMQ).
-        //  - coordinar disponibilidad con ms-andesstay-catalog al CONFIRMAR.
-        return saved;
+        // 3. Aplicar y persistir. saveAndFlush fuerza el flush aqui para detectar
+        //    fallos (ej. choque optimista) y poder compensar el cupo reservado.
+        try {
+            reservation.changeStatusTo(target);
+            Reservation saved = repository.saveAndFlush(reservation);
+            events.publishEvent(new ReservationStatusChangedEvent(saved));
+            return saved;
+        } catch (RuntimeException ex) {
+            if (slotReserved) {
+                compensateReserve(reservation.getUnitId());
+            }
+            throw ex;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -86,5 +117,27 @@ public class ReservationService {
             return repository.findByCheckInDateBetween(from, to);
         }
         return repository.findAll();
+    }
+
+    /** El cupo se devuelve al cancelar una reserva ya confirmada o al hacer checkout. */
+    private boolean releasesSlot(ReservationStatus current, ReservationStatus target) {
+        if (target == ReservationStatus.CHECKOUT) {
+            return true; // la estadia termino: el cupo vuelve al pool
+        }
+        if (target == ReservationStatus.CANCELADA) {
+            return current == ReservationStatus.CONFIRMADA
+                    || current == ReservationStatus.CHECKIN_PENDIENTE;
+        }
+        return false;
+    }
+
+    /** Best-effort: devuelve el cupo si el guardado local fallo tras reservarlo. */
+    private void compensateReserve(Long unitId) {
+        try {
+            catalogClient.releaseSlot(unitId);
+            log.warn("Compensacion: cupo devuelto en catalog (unidad {}) tras fallo local", unitId);
+        } catch (RuntimeException ex) {
+            log.error("No se pudo compensar el cupo de la unidad {} en catalog", unitId, ex);
+        }
     }
 }
