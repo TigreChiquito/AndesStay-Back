@@ -1,6 +1,6 @@
-package cl.tigrechiquito.ms_andesstay_reservations.messaging;
+package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
-import static cl.tigrechiquito.ms_andesstay_reservations.messaging.RabbitConstants.EXCHANGE_TOPIC;
+import static cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit.RabbitConstants.EXCHANGE_TOPIC;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;

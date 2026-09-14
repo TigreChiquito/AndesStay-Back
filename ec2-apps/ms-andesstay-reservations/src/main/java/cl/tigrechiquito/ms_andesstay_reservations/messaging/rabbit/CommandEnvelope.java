@@ -1,4 +1,4 @@
-package cl.tigrechiquito.ms_andesstay_reservations.messaging;
+package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
 import java.time.Instant;
 import java.util.UUID;

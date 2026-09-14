@@ -1,6 +1,7 @@
 package cl.tigrechiquito.ms_andesstay_reservations.messaging;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
+import cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit.ReservationEventListener;
 
 /**
  * Evento interno de Spring que se publica cuando una reserva cambia de estado.

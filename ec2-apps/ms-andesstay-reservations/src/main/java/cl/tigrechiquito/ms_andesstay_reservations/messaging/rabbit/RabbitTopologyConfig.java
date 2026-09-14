@@ -1,6 +1,6 @@
-package cl.tigrechiquito.ms_andesstay_reservations.messaging;
+package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
-import static cl.tigrechiquito.ms_andesstay_reservations.messaging.RabbitConstants.*;
+import static cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit.RabbitConstants.*;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;

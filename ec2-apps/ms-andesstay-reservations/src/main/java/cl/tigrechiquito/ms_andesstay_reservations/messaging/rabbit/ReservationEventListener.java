@@ -1,10 +1,11 @@
-package cl.tigrechiquito.ms_andesstay_reservations.messaging;
+package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
+import cl.tigrechiquito.ms_andesstay_reservations.messaging.ReservationStatusChangedEvent;
 
 /**
  * Reacciona al cambio de estado de una reserva y encola los comandos que

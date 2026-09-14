@@ -1,4 +1,4 @@
-package cl.tigrechiquito.ms_andesstay_reservations.messaging;
+package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
 /**
  * Nombres de la topología RabbitMQ definidos en la sección 8 de la pauta.
