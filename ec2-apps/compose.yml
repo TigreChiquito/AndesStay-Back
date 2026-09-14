@@ -1,0 +1,116 @@
+# Orquestacion de la MAQUINA 1 (ec2-apps): los 6 microservicios + Postgres.
+# RabbitMQ y Kafka viven en ec2-mq y ec2-kafka: se referencian por variables
+# de entorno (ver .env). La config se inyecta por env y sobreescribe el
+# application.yml de cada micro (que trae localhost para desarrollo).
+#
+#   Preparar: cp .env.example .env  (y completar)
+#   Levantar: docker compose up -d --build
+
+name: andesstay-apps
+
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: andesstay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-andesstay}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
+      POSTGRES_DB: reservations_db
+    volumes:
+      - andesstay_pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-andesstay} -d reservations_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  reservations:
+    build: ./ms-andesstay-reservations
+    container_name: andesstay-reservations
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reservations_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: ${MQ_HOST}
+      SPRING_RABBITMQ_PORT: ${MQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${MQ_USER:-andesstay}
+      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+      CATALOG_BASE_URL: http://catalog:8082
+
+  catalog:
+    build: ./ms-andesstay-catalog
+    container_name: andesstay-catalog
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+  notify:
+    build: ./ms-andesstay-notify
+    container_name: andesstay-notify
+    restart: unless-stopped
+    environment:
+      SPRING_RABBITMQ_HOST: ${MQ_HOST}
+      SPRING_RABBITMQ_PORT: ${MQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${MQ_USER:-andesstay}
+      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
+
+  report:
+    build: ./ms-andesstay-report
+    container_name: andesstay-report
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/report_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+
+  audit:
+    build: ./ms-andesstay-audit
+    container_name: andesstay-audit
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/audit_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+
+  bff:
+    build: ./ms-andesstay-bff
+    container_name: andesstay-bff
+    restart: unless-stopped
+    depends_on:
+      - reservations
+      - catalog
+      - report
+      - audit
+    ports:
+      - "8080:8080"     # UNICA puerta publica (la consume el AWS API Gateway)
+    environment:
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_API_CLIENT_ID: ${AZURE_API_CLIENT_ID}
+      GATEWAY_ROUTES_RESERVATIONS: http://reservations:8081
+      GATEWAY_ROUTES_UNITS: http://catalog:8082
+      GATEWAY_ROUTES_REPORTS: http://report:8084
+      GATEWAY_ROUTES_AUDIT: http://audit:8085
+
+volumes:
+  andesstay_pgdata:
