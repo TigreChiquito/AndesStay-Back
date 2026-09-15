@@ -107,6 +107,7 @@ services:
     environment:
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_API_CLIENT_ID: ${AZURE_API_CLIENT_ID}
+      CORS_ALLOWED_ORIGINS: ${FRONT_ORIGIN}
       GATEWAY_ROUTES_RESERVATIONS: http://reservations:8081
       GATEWAY_ROUTES_UNITS: http://catalog:8082
       GATEWAY_ROUTES_REPORTS: http://report:8084
