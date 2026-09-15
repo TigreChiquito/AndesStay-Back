@@ -1,0 +1,146 @@
+# MAQUINA 3 (ec2-kafka): Zookeeper (3) + Kafka (3 brokers) + Kafka UI.
+# Es la topologia de la pauta (3 replicas). Consume bastante RAM.
+#
+# Los micros de ec2-apps se conectan a KAFKA_EXTERNAL_HOST en los puertos
+# 9092/9093/9094 (un puerto por broker). En ec2-apps/.env:
+#   KAFKA_BOOTSTRAP=<KAFKA_EXTERNAL_HOST>:9092,<KAFKA_EXTERNAL_HOST>:9093,<KAFKA_EXTERNAL_HOST>:9094
+#
+#   Preparar: cp .env.example .env  (y completar KAFKA_EXTERNAL_HOST)
+#   Levantar: docker compose up -d
+
+name: andesstay-kafka
+
+x-zk-common: &zk-common
+  image: confluentinc/cp-zookeeper:7.6.1
+  restart: unless-stopped
+  environment: &zk-env
+    ZOOKEEPER_CLIENT_PORT: 2181
+    ZOOKEEPER_TICK_TIME: 2000
+    ZOOKEEPER_INIT_LIMIT: 5
+    ZOOKEEPER_SYNC_LIMIT: 2
+    ZOOKEEPER_SERVERS: zk1:2888:3888;zk2:2888:3888;zk3:2888:3888
+
+x-kafka-common: &kafka-common
+  image: confluentinc/cp-kafka:7.6.1
+  restart: unless-stopped
+  depends_on:
+    - zk1
+    - zk2
+    - zk3
+  environment: &kafka-env
+    KAFKA_ZOOKEEPER_CONNECT: zk1:2181,zk2:2181,zk3:2181
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+    KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+    KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+    KAFKA_MIN_INSYNC_REPLICAS: 2
+
+services:
+
+  # ---------- Zookeeper (ensemble de 3) ----------
+  zk1:
+    <<: *zk-common
+    container_name: andesstay-zk1
+    hostname: zk1
+    environment:
+      <<: *zk-env
+      ZOOKEEPER_SERVER_ID: 1
+    volumes:
+      - zk1_data:/var/lib/zookeeper/data
+      - zk1_log:/var/lib/zookeeper/log
+
+  zk2:
+    <<: *zk-common
+    container_name: andesstay-zk2
+    hostname: zk2
+    environment:
+      <<: *zk-env
+      ZOOKEEPER_SERVER_ID: 2
+    volumes:
+      - zk2_data:/var/lib/zookeeper/data
+      - zk2_log:/var/lib/zookeeper/log
+
+  zk3:
+    <<: *zk-common
+    container_name: andesstay-zk3
+    hostname: zk3
+    environment:
+      <<: *zk-env
+      ZOOKEEPER_SERVER_ID: 3
+    volumes:
+      - zk3_data:/var/lib/zookeeper/data
+      - zk3_log:/var/lib/zookeeper/log
+
+  # ---------- Kafka (3 brokers) ----------
+  # Cada broker tiene 2 listeners: INTERNAL (entre brokers/ZK/UI, por nombre de
+  # servicio) y EXTERNAL (para ec2-apps, anunciado con KAFKA_EXTERNAL_HOST y un
+  # puerto unico por broker: 9092, 9093, 9094).
+  kafka1:
+    <<: *kafka-common
+    container_name: andesstay-kafka1
+    hostname: kafka1
+    ports:
+      - "9092:9092"
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
+    volumes:
+      - kafka1_data:/var/lib/kafka/data
+
+  kafka2:
+    <<: *kafka-common
+    container_name: andesstay-kafka2
+    hostname: kafka2
+    ports:
+      - "9093:9092"
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 2
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9093
+    volumes:
+      - kafka2_data:/var/lib/kafka/data
+
+  kafka3:
+    <<: *kafka-common
+    container_name: andesstay-kafka3
+    hostname: kafka3
+    ports:
+      - "9094:9092"
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 3
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9094
+    volumes:
+      - kafka3_data:/var/lib/kafka/data
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: andesstay-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: andesstay
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:29092,kafka2:29092,kafka3:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+
+volumes:
+  zk1_data:
+  zk1_log:
+  zk2_data:
+  zk2_log:
+  zk3_data:
+  zk3_log:
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:

@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: ms-andesstay-report
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/report_db
+    username: andesstay
+    password: ${DB_PASSWORD:andesstay}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: ms-andesstay-report
+      auto-offset-reset: earliest        # lee desde el inicio si es un grupo nuevo
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer envuelve al de JSON: un mensaje corrupto no rompe el consumo
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.value.default.type: cl.tigrechiquito.ms_andesstay_report.messaging.ReservationEventMessage
+        spring.json.trusted.packages: "*"
+    # Productor: lo usa la DLT para republicar los mensajes fallidos
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+
+server:
+  port: 8084
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG

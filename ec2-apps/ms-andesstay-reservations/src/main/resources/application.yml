@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: ms-andesstay-reservations
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reservations_db
+    username: andesstay
+    password: ${DB_PASSWORD:andesstay}   # usa la env DB_PASSWORD si existe; si no, "andesstay"
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # crea/actualiza tablas solo en desarrollo
+    open-in-view: false         # evita el anti-patron OSIV (buena practica)
+    properties:
+      hibernate:
+        format_sql: true        # imprime el SQL ordenado y legible
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: andesstay
+    password: ${RABBIT_PASSWORD:andesstay}
+    publisher-confirm-type: correlated   # confirma que el broker recibio el mensaje
+    publisher-returns: true              # avisa si un mensaje no pudo enrutarse a ninguna cola
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all                          # durabilidad: espera confirmacion de las replicas
+      properties:
+        spring.json.add.type.headers: false   # no acoplar por clase entre servicios
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info    # expone /actuator/health para los healthchecks
+
+# Muestra el SQL que ejecuta Hibernate (util para aprender/debuggear)
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE   # ademas, los valores de los parametros (?)
+
+# URL del microservicio catalog (para coordinar disponibilidad de cupos)
+catalog:
+  base-url: ${CATALOG_BASE_URL:http://localhost:8082}

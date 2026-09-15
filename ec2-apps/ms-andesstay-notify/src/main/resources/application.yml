@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: ms-andesstay-notify
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: andesstay
+    password: ${RABBIT_PASSWORD:andesstay}
+    listener:
+      simple:
+        acknowledge-mode: manual   # ACK/NACK explícitos en el código
+        concurrency: 1             # consumidores mínimos por cola
+        max-concurrency: 3         # escala hasta 3 si hay carga
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
