@@ -9,7 +9,9 @@ spring:
           # Azure AD (Entra ID): valida firma/emisor con el discovery del tenant.
           issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0
           # Audience esperado del token (App ID URI de la API en el App Registration).
-          audiences: api://${AZURE_API_CLIENT_ID}
+          audiences: 
+          - api://${AZURE_API_CLIENT_ID}
+          - ${AZURE_API_CLIENT_ID}
 
 server:
   port: 8080          # el BFF es la puerta de entrada (detras del API Gateway)
