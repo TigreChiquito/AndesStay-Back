@@ -1,0 +1,16 @@
+# Build
+target/
+*.jar
+*.class
+ 
+# Secretos de despliegue (NUNCA subir)
+.env
+**/.env
+ 
+# IDE
+.idea/
+*.iml
+.vscode/
+ 
+# Sistema
+.DS_Store

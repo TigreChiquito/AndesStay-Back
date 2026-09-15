@@ -1,0 +1,52 @@
+# MAQUINA 2 (ec2-mq): cluster RabbitMQ de 2 nodos + Management UI.
+# Los micros de ec2-apps se conectan a la IP de esta maquina, puerto 5672.
+#
+#   Preparar: cp .env.example .env  (y completar)
+#   Levantar: docker compose up -d
+
+name: andesstay-mq
+
+services:
+
+  rabbit1:
+    image: rabbitmq:3-management
+    container_name: andesstay-rabbit1
+    hostname: rabbit1
+    restart: unless-stopped
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBIT_COOKIE:?define RABBIT_COOKIE en .env}
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-andesstay}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:?define RABBIT_PASSWORD en .env}
+    ports:
+      - "5672:5672"     # AMQP (lo usan los micros)
+      - "15672:15672"   # Management UI
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rabbit1_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  rabbit2:
+    image: rabbitmq:3-management
+    container_name: andesstay-rabbit2
+    hostname: rabbit2
+    restart: unless-stopped
+    depends_on:
+      - rabbit1
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBIT_COOKIE}
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rabbit2_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  rabbit1_data:
+  rabbit2_data:
