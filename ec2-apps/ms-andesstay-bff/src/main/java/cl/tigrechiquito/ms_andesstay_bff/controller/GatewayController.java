@@ -35,8 +35,8 @@ public class GatewayController {
     private final RestClient restClient;
     private final GatewayProperties properties;
 
-    public GatewayController(RestClient.Builder builder, GatewayProperties properties) {
-        this.restClient = builder.build();
+    public GatewayController(GatewayProperties properties) {
+        this.restClient = RestClient.create();
         this.properties = properties;
     }
 
