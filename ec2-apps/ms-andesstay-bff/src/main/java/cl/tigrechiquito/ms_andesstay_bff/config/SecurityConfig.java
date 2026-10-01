@@ -60,7 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/reports/**").hasRole("Admin")
 
                         // audit: solo lectura Auditor (o Admin)
-                        .requestMatchers("/api/audit/**").hasAnyRole("Recepcionista", "Admin")
+                        .requestMatchers("/api/audit/**").hasAnyRole("Auditor", "Admin")
 
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
