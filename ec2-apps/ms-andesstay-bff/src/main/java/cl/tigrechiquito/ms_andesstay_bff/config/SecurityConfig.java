@@ -49,18 +49,18 @@ public class SecurityConfig {
 
                         // catalog: leer autenticado; escribir solo Admin
                         .requestMatchers(HttpMethod.GET, "/api/units/**").authenticated()
-                        .requestMatchers("/api/units/**").hasRole("ADMIN")
+                        .requestMatchers("/api/units/**").hasRole("Admin")
 
                         // reservations
-                        .requestMatchers(HttpMethod.POST, "/api/reservations").hasAnyRole("HUESPED", "OPERADOR", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/status").hasAnyRole("OPERADOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/reservations").hasAnyRole("Cliente", "Recepcionista", "Admin")
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/status").hasAnyRole("Recepcionista", "Admin")
                         .requestMatchers(HttpMethod.GET, "/api/reservations/**").authenticated()
 
                         // report: solo Admin
-                        .requestMatchers("/api/reports/**").hasRole("ADMIN")
+                        .requestMatchers("/api/reports/**").hasRole("Admin")
 
                         // audit: solo lectura Auditor (o Admin)
-                        .requestMatchers("/api/audit/**").hasAnyRole("AUDITOR", "ADMIN")
+                        .requestMatchers("/api/audit/**").hasAnyRole("Recepcionista", "Admin")
 
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
