@@ -32,6 +32,9 @@ spring:
       acks: all                          # durabilidad: espera confirmacion de las replicas
       properties:
         spring.json.add.type.headers: false   # no acoplar por clase entre servicios
+        # Si Kafka no responde, send() bloquea esperando metadatos (60s por defecto)
+        # y el API Gateway corta a los 30s con 503. Se acota para no colgar el request.
+        max.block.ms: 5000
 
 server:
   port: 8081

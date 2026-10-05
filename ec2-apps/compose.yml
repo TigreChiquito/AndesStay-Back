@@ -44,6 +44,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
       CATALOG_BASE_URL: http://catalog:8082
+      ANDESSTAY_KAFKA_REPLICAS: 3   # ec2-kafka tiene 3 brokers y min.insync.replicas=2
 
   catalog:
     build: ./ms-andesstay-catalog
@@ -79,6 +80,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+      ANDESSTAY_KAFKA_REPLICAS: 3
 
   audit:
     build: ./ms-andesstay-audit
@@ -92,6 +94,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+      ANDESSTAY_KAFKA_REPLICAS: 3
 
   bff:
     build: ./ms-andesstay-bff

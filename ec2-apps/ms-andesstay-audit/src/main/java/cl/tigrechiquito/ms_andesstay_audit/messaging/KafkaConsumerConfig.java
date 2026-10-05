@@ -1,6 +1,7 @@
 package cl.tigrechiquito.ms_andesstay_audit.messaging;
 
 import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.beans.factory.annotation.Value;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,10 +20,10 @@ import org.springframework.util.backoff.FixedBackOff;
 public class KafkaConsumerConfig {
 
     @Bean
-    NewTopic auditDlt() {
+    NewTopic auditDlt(@Value("${andesstay.kafka.replicas:1}") int replicas) {
         return TopicBuilder.name(KafkaConstants.TOPIC_DLT)
                 .partitions(3)
-                .replicas(1)   // dev = 1 broker; en ec2-kafka -> 3
+                .replicas(replicas)   // dev = 1 broker; en ec2-kafka -> 3 (ANDESSTAY_KAFKA_REPLICAS)
                 .build();
     }
 
