@@ -53,3 +53,20 @@ directos. Útil para probar el flujo end-to-end (incluyendo Kafka), pero
 requiere que `catalog`, `reservations`, `audit`, `report` y Kafka estén
 todos arriba y bien conectados — más frágil que los scripts SQL de arriba
 para un primer smoke test post-deploy.
+
+Crea hasta 10 reservas (una por unidad) y las confirma, así que descuenta
+cupos reales en catalog y dispara emails/vouchers en notify.
+
+Las URLs se configuran con las variables `RES` y `CAT` (por defecto
+`localhost:8081` y `localhost:8082`, para desarrollo local). En ec2-apps los
+micros **no publican puertos en el host**, así que hay que correrlo desde un
+contenedor conectado a la red del compose (`andesstay-apps_default`):
+
+```bash
+docker run --rm --network andesstay-apps_default -v "$PWD":/seed \
+  -e RES=http://reservations:8081 -e CAT=http://catalog:8082 \
+  alpine:3 sh -c "apk add -q bash curl && bash /seed/seed-reservations.sh"
+```
+
+Llama a los micros directamente, sin pasar por el BFF, así que no necesita
+token de Azure AD.

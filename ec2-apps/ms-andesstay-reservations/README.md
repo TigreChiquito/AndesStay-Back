@@ -1,13 +1,13 @@
 # ms-andesstay-reservations
 
-Microservicio dueño del ciclo de vida de una **reserva** de hospedaje. Expone la API REST que usa el resto del sistema (o un BFF) para crear y hacer avanzar reservas, y es la fuente de verdad que dispara los eventos y comandos asíncronos consumidos por los demás microservicios de AndesStay.
+Microservicio dueño del ciclo de vida de una **reserva** de hospedaje. Es el corazón del sistema: expone la API REST de reservas, coordina los cupos con catalog y es el origen de **toda** la mensajería (eventos a Kafka y comandos a RabbitMQ).
 
 ## Responsabilidades
 
-- CRUD/consulta de reservas y transición de estados según una máquina de estados explícita.
-- Publicar en **Kafka** (`reservations.events`) cada creación y cambio de estado, para alimentar `ms-andesstay-report` y `ms-andesstay-audit`.
-- Publicar en **RabbitMQ** los comandos de notificación que correspondan a cada cambio de estado, para que `ms-andesstay-notify` los procese.
-- Llamar a `ms-andesstay-catalog` por REST para descontar (`/reserve`) o devolver (`/release`) un cupo de la unidad reservada.
+- Crear y consultar reservas, y hacerlas avanzar por una máquina de estados explícita.
+- Descontar o devolver cupos en `ms-andesstay-catalog` por REST, de forma síncrona y con compensación.
+- Publicar en **Kafka** (`reservations.events`) cada creación y cambio de estado, para report y audit.
+- Publicar en **RabbitMQ** los comandos de notificación que correspondan, para notify.
 
 ## Máquina de estados
 
@@ -17,24 +17,29 @@ CREADA ──▶ CONFIRMADA ──▶ CHECKIN_PENDIENTE ──▶ EN_ESTADIA ─
    └────────────┴────────────────┴──▶ CANCELADA
 ```
 
-- `CANCELADA` es un estado terminal alternativo, solo alcanzable antes de que comience la estadía (desde `CREADA`, `CONFIRMADA` o `CHECKIN_PENDIENTE`).
-- `CHECKOUT` y `CANCELADA` son terminales.
-- El parseo de estados desde JSON es tolerante a tildes y mayúsculas/minúsculas (p. ej. acepta `"en_estadía"`).
+| Desde | Puede pasar a |
+|---|---|
+| `CREADA` | `CONFIRMADA`, `CANCELADA` |
+| `CONFIRMADA` | `CHECKIN_PENDIENTE`, `CANCELADA` |
+| `CHECKIN_PENDIENTE` | `EN_ESTADIA`, `CANCELADA` |
+| `EN_ESTADIA` | `CHECKOUT` |
+| `CHECKOUT`, `CANCELADA` | — (terminales) |
 
-La validación de transiciones vive en la propia entidad `Reservation` (modelo de dominio rico), no en el service.
+- La regla "no hay check-in sin confirmar" queda garantizada por la propia tabla de transiciones.
+- La validación vive en el dominio (`ReservationStatus.canTransitionTo` y `Reservation.changeStatusTo`), no en el service.
+- El parseo del estado es tolerante a tildes y mayúsculas: `"en_estadía"` se interpreta como `EN_ESTADIA`.
+- Pedir el mismo estado en que ya está la reserva no es error (es idempotente en el dominio). Ojo: igual se vuelve a publicar el evento, así que repetir `CONFIRMADA` reenvía el email y el voucher.
 
 ## API REST
 
 Base path: `/api/reservations`
 
-| Método | Endpoint | Descripción |
+| Método | Endpoint | Respuesta |
 |---|---|---|
-| `POST` | `/api/reservations` | Crea una reserva (nace en `CREADA`) |
-| `GET` | `/api/reservations/{id}` | Obtiene una reserva por id |
-| `PUT` | `/api/reservations/{id}/status` | Cambia el estado según la máquina de estados |
-| `GET` | `/api/reservations?status=&from=&to=` | Búsqueda con filtros opcionales (estado, rango de fechas de check-in/out) |
-
-Ejemplo de creación:
+| `POST` | `/api/reservations` | **201** + `Location`. La reserva nace en `CREADA` |
+| `GET` | `/api/reservations/{id}` | 200, o 404 |
+| `PUT` | `/api/reservations/{id}/status` | 200, o 409 si la transición es inválida o no hay cupo |
+| `GET` | `/api/reservations?status=&from=&to=` | 200. Filtros opcionales; `from`/`to` filtran por fecha de check-in y deben ir juntos |
 
 ```json
 POST /api/reservations
@@ -42,73 +47,129 @@ POST /api/reservations
   "guestId": "guest-123",
   "guestName": "Ana Pérez",
   "unitId": 1,
-  "checkInDate": "2025-12-01",
-  "checkOutDate": "2025-12-05"
+  "checkInDate": "2026-12-01",
+  "checkOutDate": "2026-12-05"
 }
 ```
-
-Cambio de estado:
 
 ```json
 PUT /api/reservations/1/status
 { "status": "CONFIRMADA" }
 ```
 
-> `guestId` viaja hoy en el body a modo temporal; cuando se integre autenticación (Azure AD), se extraerá del token en vez de recibirse explícito.
+Respuesta (`ReservationResponse`): `id, guestId, guestName, unitId, checkInDate, checkOutDate, status, createdAt, updatedAt`.
+
+### Errores (ProblemDetail, RFC 7807)
+
+| Código | Cuándo |
+|---|---|
+| 400 | Payload inválido, `checkOutDate` no posterior a `checkInDate`, estado desconocido o unidad inexistente en catalog |
+| 404 | La reserva no existe |
+| 409 | Transición de estado inválida (incluye `from` y `to`), o la unidad no tiene cupo |
+| 503 | catalog no responde al confirmar o cancelar |
+
+> `guestId` viaja hoy en el body. Cuando se integre la identidad desde el BFF, debería sacarse del token.
+
+## Integración con catalog (REST síncrono)
+
+`CatalogClient` llama a `${catalog.base-url}/api/units/{id}/reserve|release`:
+
+| Transición | Llamada a catalog |
+|---|---|
+| → `CONFIRMADA` | `reserve`: descuenta un cupo. Si catalog responde 409, se aborta la confirmación |
+| `CONFIRMADA` / `CHECKIN_PENDIENTE` → `CANCELADA` | `release`: devuelve el cupo |
+| → `CHECKOUT` | `release`: la estadía terminó y el cupo vuelve al pool |
+| `CREADA` → `CANCELADA` | ninguna (nunca se descontó cupo) |
+
+La transición se valida **antes** de llamar a catalog, para no reservar un cupo en vano. Si después de reservar el cupo falla el guardado local, se **compensa** llamando a `release`.
+
+No hay FK entre servicios: `unitId` es una referencia lógica a catalog.
 
 ## Mensajería
 
+Toda la publicación ocurre en listeners `@TransactionalEventListener(AFTER_COMMIT)`: los mensajes salen **solo si la transacción hizo commit**. Así nunca se notifica algo que luego hace rollback.
+
 ### Kafka — `reservations.events`
 
-Se publica **después del commit** de la transacción (`AFTER_COMMIT`), tanto en la creación como en cada cambio de estado. Es el tópico que alimenta a `ms-andesstay-report` y `ms-andesstay-audit` (cada uno con su propio `group-id`, en modo fan-out).
+- Se publica en la creación (`reservation.created`) y en cada cambio de estado (`reservation.status_changed`).
+- Key = `reservationId`, para que todos los eventos de una reserva caigan en la misma partición y mantengan su orden.
+- Productor con `acks=all` y sin type headers (`spring.json.add.type.headers=false`), para no acoplar a los consumidores con la clase Java.
+- `max.block.ms=5000`: si Kafka no responde, el envío se rinde a los 5 s y el error queda en el log. La reserva **ya está guardada** y el request responde normalmente, sin quedar colgado hasta el timeout de 30 s del API Gateway.
 
-Tipos de evento: `reservation.created`, `reservation.status_changed`.
+```json
+{
+  "type": "reservation.status_changed",
+  "eventId": "uuid",
+  "timestamp": "2026-10-05T22:43:01Z",
+  "reservationId": 1,
+  "guestId": "guest-123",
+  "unitId": 1,
+  "checkInDate": "2026-12-01",
+  "checkOutDate": "2026-12-05",
+  "status": "CONFIRMADA"
+}
+```
+
+El tópico se declara con 3 particiones y `andesstay.kafka.replicas` réplicas (`ANDESSTAY_KAFKA_REPLICAS`): 1 por defecto en dev, 3 en ec2-kafka.
 
 ### RabbitMQ — comandos de notificación
 
-Este servicio declara y es dueño de la topología de comandos (`RabbitTopologyConfig`), que `ms-andesstay-notify` re-declara de forma idempotente al arrancar:
+Este servicio es dueño de la topología (`RabbitTopologyConfig`). notify la re-declara de forma idempotente.
 
-- Exchanges: `cmd.direct` (routing key exacta) y `cmd.topic` (patrones), ambos con dead-lettering hacia `cmd.dead.dlx`.
-- Colas principales: `q.cmd.email`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su DLQ (`*.dlq`).
+- Exchanges: `cmd.direct`, `cmd.topic` y `cmd.dead.dlx` (dead-letter).
+- Colas: `q.cmd.email`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
+- Se publica al exchange **topic** con el `CommandEnvelope` `{type, eventId, timestamp, traceId, correlationId, payload}`. `correlationId` = `reservation-<id>`.
 
-Ante un cambio de estado (también `AFTER_COMMIT`, para no notificar algo que luego hace rollback) se publican estos comandos:
-
-| Estado nuevo | Comandos publicados |
+| Estado nuevo | Comandos (routing key) |
 |---|---|
 | `CONFIRMADA` | `email.confirmation`, `voucher.gen` |
 | `CHECKIN_PENDIENTE` | `housekeeping.ticket`, `email.reminder` |
 | `CHECKOUT` | `email.checkout` |
-| `CREADA` / `EN_ESTADIA` / `CANCELADA` | (sin notificación) |
+| `CREADA` / `EN_ESTADIA` / `CANCELADA` | — |
 
-## Integración con catalog
+El productor usa *publisher confirms* y *publisher returns*.
 
-Al confirmar una reserva se llama a `POST /api/units/{id}/reserve` en `ms-andesstay-catalog` para descontar un cupo; al cancelarla, a `POST /api/units/{id}/release` para devolverlo. No hay FK entre servicios: `unitId` es solo una referencia lógica a otro microservicio.
+## Estructura
+
+```
+ms_andesstay_reservations/
+├── domain/        Reservation · ReservationStatus · excepciones de dominio
+├── repository/    ReservationRepository
+├── dto/           CreateReservationRequest · UpdateStatusRequest · ReservationResponse
+├── service/       ReservationService (transiciones + coordinación con catalog)
+├── client/        CatalogClient · UnitNotAvailableException · CatalogUnavailableException
+├── controller/    ReservationController · GlobalExceptionHandler
+└── messaging/
+    ├── ReservationCreatedEvent · ReservationStatusChangedEvent   (eventos internos)
+    ├── kafka/     KafkaEventListener · ReservationEventPublisher · KafkaTopicConfig · ...
+    └── rabbit/    ReservationEventListener · ReservationCommandPublisher · RabbitTopologyConfig · ...
+```
 
 ## Configuración
 
-Ver `src/main/resources/Application.yml`.
+`src/main/resources/application.yml` (valores para desarrollo local). En el contenedor se sobrescriben por variables de entorno desde [`../compose.yml`](../compose.yml).
 
-| Propiedad | Valor por defecto | Descripción |
+| Propiedad | Default | Variable en el compose |
 |---|---|---|
-| `server.port` | `8081` | Puerto HTTP |
-| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/reservations_db` | Base de datos propia |
-| `spring.datasource.password` | `andesstay` | Sobrescribible con `DB_PASSWORD` |
-| `spring.rabbitmq.*` | `localhost:5672` | Sobrescribible con `RABBIT_PASSWORD` |
+| `server.port` | `8081` | — |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/reservations_db` | `SPRING_DATASOURCE_URL` |
+| `spring.datasource.password` | `andesstay` | `SPRING_DATASOURCE_PASSWORD` |
+| `spring.rabbitmq.host` / `port` | `localhost:5672` | `SPRING_RABBITMQ_HOST` / `_PORT` |
+| `spring.rabbitmq.password` | `andesstay` | `SPRING_RABBITMQ_PASSWORD` |
+| `spring.kafka.bootstrap-servers` | `localhost:9092` | `SPRING_KAFKA_BOOTSTRAP_SERVERS` |
+| `catalog.base-url` | `http://localhost:8082` | `CATALOG_BASE_URL` |
+| `andesstay.kafka.replicas` | `1` | `ANDESSTAY_KAFKA_REPLICAS` |
 
-`spring.jpa.hibernate.ddl-auto=update` está pensado solo para desarrollo.
+`ddl-auto: update` crea y actualiza las tablas automáticamente. El log de SQL (`DEBUG`/`TRACE`) está activo para aprendizaje.
+
+> Spring Boot 4: el `RestClient.Builder` que usa `CatalogClient` requiere `spring-boot-starter-restclient`. Sin ese starter, el micro no arranca.
 
 ## Ejecutar localmente
 
-Requiere PostgreSQL (`reservations_db`), Kafka y RabbitMQ corriendo en `localhost`.
+Requiere PostgreSQL (`reservations_db`), Kafka, RabbitMQ y catalog en `localhost`.
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
 Health check: `GET http://localhost:8081/actuator/health`.
-
-## Tests
-
-```bash
-./mvnw test
-```

@@ -1,5 +1,15 @@
 # AndesStay — Contexto del Backend (handoff de sesión)
 
+> **Nota de vigencia (oct-2026):** este es el documento de traspaso de una etapa
+> anterior y se conserva por sus decisiones de diseño y los *gotchas* de Boot 4.
+> Desde entonces cambiaron algunas cosas:
+> - El **bff** ya está implementado, y ya existen los Dockerfiles y los `compose.yml` de las 3 máquinas.
+> - La carpeta `dev/` no está en el repo.
+> - El **frontend** es React + Vite + MSAL, no Angular.
+> - Boot 4 también separó el `RestClient.Builder` en `spring-boot-starter-restclient`.
+>
+> El estado actual está en el [README](README.md) raíz y en el README de cada carpeta.
+
 Plataforma de reservas de hospedaje basada en microservicios (Caso 5). Este
 documento resume el estado del **backend en Spring Boot**, las decisiones
 tomadas y lo que falta. El **frontend (Angular + MSAL)** lo trabaja la compañera
