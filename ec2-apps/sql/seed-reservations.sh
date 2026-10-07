@@ -2,14 +2,15 @@
 # Genera reservas de prueba: crea y confirma. Cada una emite eventos a Kafka
 # que alimentan audit (linea de tiempo) y report (KPIs).
 #
-# Correr en ec2-apps:
+# En ec2-apps los micros no publican puertos en el host: correrlo dentro de la
+# red de Docker (ver README.md). En local basta con:
 #   bash seed-reservations.sh
 #
-# Requiere que esten arriba: reservations (8081), catalog (8082), Kafka, audit, report.
+# Requiere que esten arriba: reservations, catalog, Kafka, audit, report.
 
 set -u
-RES="http://localhost:8081"
-CAT="http://localhost:8082"
+RES="${RES:-http://localhost:8081}"
+CAT="${CAT:-http://localhost:8082}"
 
 echo "== Obteniendo unidades del catalogo =="
 UNIT_IDS=$(curl -s "$CAT/api/units" | grep -o '"id":[0-9]*' | grep -o '[0-9]*' | head -10)
