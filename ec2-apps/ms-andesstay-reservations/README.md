@@ -39,6 +39,7 @@ Base path: `/api/reservations`
 | `POST` | `/api/reservations` | **201** + `Location`. La reserva nace en `CREADA` |
 | `GET` | `/api/reservations/{id}` | 200, o 404 |
 | `PUT` | `/api/reservations/{id}/status` | 200, o 409 si la transición es inválida o no hay cupo |
+| `POST` | `/api/reservations/{id}/cancel` | 200; 403 si un huésped intenta cancelar una reserva ajena; 409 si ya no es cancelable |
 | `GET` | `/api/reservations?status=&from=&to=` | 200. Filtros opcionales; `from`/`to` filtran por fecha de check-in y deben ir juntos |
 
 ```json
@@ -64,11 +65,23 @@ Respuesta (`ReservationResponse`): `id, guestId, guestName, unitId, checkInDate,
 | Código | Cuándo |
 |---|---|
 | 400 | Payload inválido, `checkOutDate` no posterior a `checkInDate`, estado desconocido o unidad inexistente en catalog |
+| 403 | Un huésped intenta cancelar una reserva que no es suya |
 | 404 | La reserva no existe |
 | 409 | Transición de estado inválida (incluye `from` y `to`), o la unidad no tiene cupo |
 | 503 | catalog no responde al confirmar o cancelar |
 
 > `guestId` viaja hoy en el body. Cuando se integre la identidad desde el BFF, debería sacarse del token.
+
+### Cancelación por el huésped (`POST /{id}/cancel`)
+
+Es un endpoint aparte de `PUT /status`, para que el rol Cliente pueda cancelar **sin** poder pasar a otros estados (confirmar, check-in, etc.):
+
+- Lee la identidad desde los headers que agrega el BFF: `X-User-Id` (el `oid` del token) y `X-User-Roles`.
+- **Recepcionista y Admin** pueden cancelar cualquier reserva.
+- **Cualquier otro usuario** solo puede cancelar las reservas cuyo `guestId` coincida con su `X-User-Id`; si no, responde **403**.
+- Después usa el mismo flujo de `changeStatus(CANCELADA)`: valida la transición, devuelve el cupo a catalog si estaba confirmada y publica los eventos.
+
+Para que esta regla funcione, las reservas deben crearse con `guestId` = `localAccountId` de MSAL, que es lo que manda el front.
 
 ## Integración con catalog (REST síncrono)
 

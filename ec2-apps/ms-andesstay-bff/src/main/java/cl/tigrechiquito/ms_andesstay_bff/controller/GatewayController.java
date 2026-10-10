@@ -1,12 +1,17 @@
 package cl.tigrechiquito.ms_andesstay_bff.controller;
 
 import java.net.URI;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,9 +33,18 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * Es un proxy de paso didáctico (reenvía método, query, body y content-type).
  * Para producción se usaría un gateway real; acá basta para el flujo del caso.
+ *
+ * Además propaga la identidad del token validado en dos headers, para que los
+ * micros puedan aplicar reglas de pertenencia (ej. "solo tus reservas"):
+ *   X-User-Id    -> claim "oid" (id del usuario en Azure AD = localAccountId en MSAL)
+ *   X-User-Roles -> App Roles separados por coma
+ * Los headers que mande el cliente nunca se reenvían, así que no se pueden falsificar.
  */
 @RestController
 public class GatewayController {
+
+    static final String HEADER_USER_ID = "X-User-Id";
+    static final String HEADER_USER_ROLES = "X-User-Roles";
 
     private final RestClient restClient;
     private final GatewayProperties properties;
@@ -63,6 +77,7 @@ public class GatewayController {
         if (body != null && body.length > 0) {
             spec = spec.body(body);
         }
+        spec = addIdentityHeaders(spec);
 
         try {
             ResponseEntity<byte[]> downstream = spec.retrieve()
@@ -79,6 +94,24 @@ public class GatewayController {
             // el micro de destino no responde
             return ResponseEntity.status(502).build();
         }
+    }
+
+    /** Agrega X-User-Id y X-User-Roles a partir del JWT ya validado por Spring Security. */
+    private RestClient.RequestBodySpec addIdentityHeaders(RestClient.RequestBodySpec spec) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
+            return spec;
+        }
+        String userId = jwtAuth.getToken().getClaimAsString("oid");
+        if (userId != null) {
+            spec = spec.header(HEADER_USER_ID, userId);
+        }
+        String roles = jwtAuth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a.startsWith("ROLE_"))
+                .map(a -> a.substring("ROLE_".length()))
+                .collect(Collectors.joining(","));
+        return spec.header(HEADER_USER_ROLES, roles);
     }
 
     /** Del path /api/{segmento}/... saca el segmento y busca su URL base. */

@@ -27,7 +27,16 @@ Reenvía el método, el path completo, el query string, el body y el `Content-Ty
 - **404** si el segmento no tiene ruta configurada.
 - **502** (sin cuerpo) si el micro de destino no responde: está caído, reiniciándose o no resuelve por nombre.
 
-> Es un proxy simple y didáctico. No reenvía el header `Authorization` a los micros: la seguridad termina en el BFF, y los micros confían en la red interna de Docker.
+### Propagación de identidad
+
+El BFF no reenvía el header `Authorization`. En su lugar, agrega dos headers a partir del token ya validado:
+
+| Header | Contenido |
+|---|---|
+| `X-User-Id` | Claim `oid` del token: el id del usuario en Azure AD, igual al `localAccountId` de MSAL |
+| `X-User-Roles` | App Roles separados por coma, por ejemplo `Cliente` o `Recepcionista,Admin` |
+
+Los micros los usan para reglas de pertenencia; por ejemplo, reservations solo deja que un Cliente cancele sus propias reservas. Los headers que mande el cliente **nunca** se reenvían, así que no se pueden falsificar desde fuera. Eso sí, los micros confían en la red interna de Docker: cualquiera con acceso directo a ella podría mandarlos.
 
 ## Autorización por rol
 
@@ -41,6 +50,7 @@ Definida en [`SecurityConfig`](src/main/java/cl/tigrechiquito/ms_andesstay_bff/c
 | `/api/units/**` | POST / PUT / DELETE | `Admin` |
 | `/api/reservations` | POST | `Cliente`, `Recepcionista`, `Admin` |
 | `/api/reservations/*/status` | PUT | `Recepcionista`, `Admin` |
+| `/api/reservations/*/cancel` | POST | `Cliente`, `Recepcionista`, `Admin`. El Cliente solo puede cancelar sus propias reservas (lo valida reservations) |
 | `/api/reservations/**` | GET | Cualquier usuario autenticado |
 | `/api/reports/**` | todos | `Admin` |
 | `/api/audit/**` | todos | `Auditor`, `Admin` |

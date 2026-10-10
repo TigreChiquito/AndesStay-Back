@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogClient;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationAccessDeniedException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationNotFoundException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.CreateReservationRequest;
@@ -60,6 +61,21 @@ public class ReservationService {
         // El KafkaEventListener emite "reservation.created" a Kafka AFTER_COMMIT.
         events.publishEvent(new ReservationCreatedEvent(saved));
         return saved;
+    }
+
+    /**
+     * Cancela una reserva a pedido de un usuario. El personal (Recepcionista/Admin)
+     * puede cancelar cualquiera; un huésped solo las suyas (guestId == userId).
+     * El resto (transición válida, devolución de cupo, eventos) es el mismo
+     * flujo de changeStatus.
+     */
+    @Transactional
+    public Reservation cancel(Long id, String userId, boolean staff) {
+        Reservation reservation = getById(id);
+        if (!staff && (userId == null || !userId.equals(reservation.getGuestId()))) {
+            throw new ReservationAccessDeniedException(id);
+        }
+        return changeStatus(id, ReservationStatus.CANCELADA);
     }
 
     @Transactional(readOnly = true)

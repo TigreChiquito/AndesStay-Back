@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogUnavailableException;
 import cl.tigrechiquito.ms_andesstay_reservations.client.UnitNotAvailableException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationAccessDeniedException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationNotFoundException;
 
 /**
@@ -25,6 +26,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ReservationNotFoundException.class)
     public ProblemDetail handleNotFound(ReservationNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /** Un huésped intenta operar sobre una reserva ajena -> 403 Forbidden. */
+    @ExceptionHandler(ReservationAccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(ReservationAccessDeniedException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidReservationStatusTransitionException.class)

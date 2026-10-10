@@ -54,6 +54,8 @@ public class SecurityConfig {
                         // reservations
                         .requestMatchers(HttpMethod.POST, "/api/reservations").hasAnyRole("Cliente", "Recepcionista", "Admin")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/status").hasAnyRole("Recepcionista", "Admin")
+                        // cancelar: el Cliente también, pero solo sus reservas (lo valida reservations con X-User-Id)
+                        .requestMatchers(HttpMethod.POST, "/api/reservations/*/cancel").hasAnyRole("Cliente", "Recepcionista", "Admin")
                         .requestMatchers(HttpMethod.GET, "/api/reservations/**").authenticated()
 
                         // report: solo Admin

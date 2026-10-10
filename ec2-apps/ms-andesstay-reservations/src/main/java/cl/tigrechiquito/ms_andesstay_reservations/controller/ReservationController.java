@@ -2,6 +2,7 @@ package cl.tigrechiquito.ms_andesstay_reservations.controller;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,6 +61,20 @@ public class ReservationController {
         return ReservationResponse.from(service.changeStatus(id, request.status()));
     }
 
+    /**
+     * POST /api/reservations/{id}/cancel — cancela la reserva. Un huésped solo puede
+     * cancelar las suyas; el personal, cualquiera. La identidad la propaga el BFF
+     * desde el token validado (X-User-Id = oid, X-User-Roles = App Roles).
+     */
+    @PostMapping("/{id}/cancel")
+    public ReservationResponse cancel(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+
+        return ReservationResponse.from(service.cancel(id, userId, isStaff(roles)));
+    }
+
     /** GET /api/reservations?status=...&from=...&to=... — todos los filtros opcionales. */
     @GetMapping
     public List<ReservationResponse> search(
@@ -73,5 +89,14 @@ public class ReservationController {
         return service.search(parsedStatus, from, to).stream()
                 .map(ReservationResponse::from)
                 .toList();
+    }
+
+    private static boolean isStaff(String roles) {
+        if (roles == null) {
+            return false;
+        }
+        return Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .anyMatch(role -> role.equals("Recepcionista") || role.equals("Admin"));
     }
 }
