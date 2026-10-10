@@ -94,6 +94,12 @@ public class ReservationService {
             throw new InvalidReservationStatusTransitionException(current, target);
         }
 
+        // Mismo estado: idempotente. Sin esto se re-publicaban eventos/avisos y
+        // un CHECKOUT repetido devolvía otro cupo a catalog.
+        if (target == current) {
+            return reservation;
+        }
+
         // 2. Coordinar disponibilidad con catalog (sincrono).
         //    Confirmar descuenta un cupo; si no hay, catalog responde 409 y abortamos.
         boolean slotReserved = false;

@@ -52,10 +52,10 @@ public class RabbitTopologyConfig {
     // ---------- Colas principales (con dead-lettering) ----------
 
     @Bean
-    Queue emailQueue() {
-        return QueueBuilder.durable(QUEUE_EMAIL)
+    Queue notificationQueue() {
+        return QueueBuilder.durable(QUEUE_NOTIFICATION)
                 .deadLetterExchange(EXCHANGE_DLX)
-                .deadLetterRoutingKey(RK_EMAIL_DLQ)
+                .deadLetterRoutingKey(RK_NOTIFICATION_DLQ)
                 .build();
     }
 
@@ -78,8 +78,8 @@ public class RabbitTopologyConfig {
     // ---------- DLQ ----------
 
     @Bean
-    Queue emailDlq() {
-        return QueueBuilder.durable(QUEUE_EMAIL_DLQ).build();
+    Queue notificationDlq() {
+        return QueueBuilder.durable(QUEUE_NOTIFICATION_DLQ).build();
     }
 
     @Bean
@@ -95,13 +95,13 @@ public class RabbitTopologyConfig {
     // ---------- Bindings de colas principales: direct + topic ----------
 
     @Bean
-    Binding emailDirectBinding() {
-        return BindingBuilder.bind(emailQueue()).to(cmdDirect()).with(RK_EMAIL_SEND);
+    Binding notificationDirectBinding() {
+        return BindingBuilder.bind(notificationQueue()).to(cmdDirect()).with(RK_NOTIFICATION_SEND);
     }
 
     @Bean
-    Binding emailTopicBinding() {
-        return BindingBuilder.bind(emailQueue()).to(cmdTopic()).with(PATTERN_EMAIL);
+    Binding notificationTopicBinding() {
+        return BindingBuilder.bind(notificationQueue()).to(cmdTopic()).with(PATTERN_NOTIFICATION);
     }
 
     @Bean
@@ -127,8 +127,8 @@ public class RabbitTopologyConfig {
     // ---------- Bindings de las DLQ hacia cmd.dead.dlx ----------
 
     @Bean
-    Binding emailDlqBinding() {
-        return BindingBuilder.bind(emailDlq()).to(cmdDlx()).with(RK_EMAIL_DLQ);
+    Binding notificationDlqBinding() {
+        return BindingBuilder.bind(notificationDlq()).to(cmdDlx()).with(RK_NOTIFICATION_DLQ);
     }
 
     @Bean

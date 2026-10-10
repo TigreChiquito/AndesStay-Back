@@ -23,6 +23,8 @@ spring:
     password: ${RABBIT_PASSWORD:andesstay}
     publisher-confirm-type: correlated   # confirma que el broker recibio el mensaje
     publisher-returns: true              # avisa si un mensaje no pudo enrutarse a ninguna cola
+    # Si ec2-mq no responde, no colgar el request hasta el timeout del API Gateway (30s)
+    connection-timeout: 5s
 
   kafka:
     bootstrap-servers: localhost:9092

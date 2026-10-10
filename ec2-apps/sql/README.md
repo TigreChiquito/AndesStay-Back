@@ -55,7 +55,7 @@ todos arriba y bien conectados — más frágil que los scripts SQL de arriba
 para un primer smoke test post-deploy.
 
 Crea hasta 10 reservas (una por unidad) y las confirma, así que descuenta
-cupos reales en catalog y dispara emails/vouchers en notify.
+cupos reales en catalog y genera avisos y vouchers en notify.
 
 Las URLs se configuran con las variables `RES` y `CAT` (por defecto
 `localhost:8081` y `localhost:8082`, para desarrollo local). En ec2-apps los

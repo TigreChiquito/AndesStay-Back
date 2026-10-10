@@ -40,18 +40,21 @@ public class NotificationListener {
         this.processed = processed;
     }
 
-    @RabbitListener(queues = RabbitConstants.QUEUE_EMAIL)
-    public void onEmail(CommandEnvelope<NotificationPayload> env, Channel channel,
-                        @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-        handle(env, channel, tag, () -> service.sendEmail(env));
+    /** Avisos al huésped (notification.*). */
+    @RabbitListener(queues = RabbitConstants.QUEUE_NOTIFICATION)
+    public void onNotification(CommandEnvelope<NotificationPayload> env, Channel channel,
+                               @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
+        handle(env, channel, tag, () -> service.notifyGuest(env));
     }
 
+    /** Avisos al personal: Recepcionista/Admin (housekeeping.#). */
     @RabbitListener(queues = RabbitConstants.QUEUE_HOUSEKEEPING)
     public void onHousekeeping(CommandEnvelope<NotificationPayload> env, Channel channel,
                                @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-        handle(env, channel, tag, () -> service.createHousekeepingTicket(env));
+        handle(env, channel, tag, () -> service.notifyStaff(env));
     }
 
+    /** Generación del voucher (voucher.*). Por ahora solo se registra en el log. */
     @RabbitListener(queues = RabbitConstants.QUEUE_VOUCHER)
     public void onVoucher(CommandEnvelope<NotificationPayload> env, Channel channel,
                           @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {

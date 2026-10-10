@@ -12,8 +12,9 @@ AndesStay usa **un solo motor Postgres con una base por microservicio** (*databa
 | `catalog_db` | catalog | [`01 create databases.sql`](01%20create%20databases.sql) |
 | `audit_db` | audit | `01 create databases.sql` |
 | `report_db` | report | `01 create databases.sql` |
+| `notify_db` | notify | `01 create databases.sql` |
 
-notify y el BFF no tienen base. Todas las bases quedan como propiedad del usuario `DB_USER` (por defecto `andesstay`).
+El BFF no tiene base. Todas las bases quedan como propiedad del usuario `DB_USER` (por defecto `andesstay`).
 
 Las **tablas** no se crean aquí: las genera Hibernate (`ddl-auto: update`) cuando cada micro arranca por primera vez.
 
@@ -34,6 +35,12 @@ Si hace falta agregar una base nueva con el volumen ya creado, hay dos opciones:
   ```bash
   docker compose down -v && docker compose up -d
   ```
+
+> **Volumen creado antes de que existiera `notify_db`:** el script no vuelve a correr, así que hay que crearla a mano una vez:
+>
+> ```bash
+> docker exec andesstay-postgres psql -U andesstay -d reservations_db -c "CREATE DATABASE notify_db;"
+> ```
 
 ## Notas
 

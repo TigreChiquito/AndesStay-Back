@@ -61,6 +61,9 @@ public class SecurityConfig {
                         // report: solo Admin
                         .requestMatchers("/api/reports/**").hasRole("Admin")
 
+                        // notificaciones: cada usuario ve las suyas (notify filtra con X-User-Id / X-User-Roles)
+                        .requestMatchers("/api/notifications/**").authenticated()
+
                         // audit: solo lectura Auditor (o Admin)
                         .requestMatchers("/api/audit/**").hasAnyRole("Auditor", "Admin")
 

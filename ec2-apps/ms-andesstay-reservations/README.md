@@ -28,7 +28,7 @@ CREADA ──▶ CONFIRMADA ──▶ CHECKIN_PENDIENTE ──▶ EN_ESTADIA ─
 - La regla "no hay check-in sin confirmar" queda garantizada por la propia tabla de transiciones.
 - La validación vive en el dominio (`ReservationStatus.canTransitionTo` y `Reservation.changeStatusTo`), no en el service.
 - El parseo del estado es tolerante a tildes y mayúsculas: `"en_estadía"` se interpreta como `EN_ESTADIA`.
-- Pedir el mismo estado en que ya está la reserva no es error (es idempotente en el dominio). Ojo: igual se vuelve a publicar el evento, así que repetir `CONFIRMADA` reenvía el email y el voucher.
+- Pedir el mismo estado en que ya está la reserva no es error: responde 200 sin hacer nada (no llama a catalog ni publica eventos).
 
 ## API REST
 
@@ -130,17 +130,23 @@ El tópico se declara con 3 particiones y `andesstay.kafka.replicas` réplicas (
 Este servicio es dueño de la topología (`RabbitTopologyConfig`). notify la re-declara de forma idempotente.
 
 - Exchanges: `cmd.direct`, `cmd.topic` y `cmd.dead.dlx` (dead-letter).
-- Colas: `q.cmd.email`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
+- Colas: `q.cmd.notification`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
 - Se publica al exchange **topic** con el `CommandEnvelope` `{type, eventId, timestamp, traceId, correlationId, payload}`. `correlationId` = `reservation-<id>`.
 
-| Estado nuevo | Comandos (routing key) |
-|---|---|
-| `CONFIRMADA` | `email.confirmation`, `voucher.gen` |
-| `CHECKIN_PENDIENTE` | `housekeeping.ticket`, `email.reminder` |
-| `CHECKOUT` | `email.checkout` |
-| `CREADA` / `EN_ESTADIA` / `CANCELADA` | — |
+| Estado | Aviso al huésped (`notification.*`) | Aviso al personal (`housekeeping.#`) | Otros |
+|---|---|---|---|
+| CREADA (al crear) | `notification.created` | `housekeeping.new_reservation` | — |
+| CONFIRMADA | `notification.confirmed` | — | `voucher.gen` |
+| CHECKIN_PENDIENTE | — | `housekeeping.prepare_unit` | — |
+| EN_ESTADIA | — | — | — |
+| CHECKOUT | `notification.checkout` | `housekeeping.clean_unit` | — |
+| CANCELADA | `notification.cancelled` | `housekeeping.reservation_cancelled` | — |
 
-El productor usa *publisher confirms* y *publisher returns*.
+Lo que hace notify con cada uno está en su [README](../ms-andesstay-notify/README.md).
+
+- Un fallo de RabbitMQ no se convierte en error HTTP: el cambio ya está guardado, así que el error queda en el log.
+- `spring.rabbitmq.connection-timeout: 5s`, para que un ec2-mq que no responde no deje el request colgado hasta el timeout de 30 s del API Gateway.
+- El productor usa *publisher confirms* y *publisher returns*.
 
 ## Estructura
 

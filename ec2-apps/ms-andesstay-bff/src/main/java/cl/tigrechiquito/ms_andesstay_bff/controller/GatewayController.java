@@ -30,6 +30,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *   /api/units/**         -> catalog (clave "units")
  *   /api/reports/**       -> report  (clave "reports")
  *   /api/audit/**         -> audit
+ *   /api/notifications/** -> notify  (clave "notifications")
  *
  * Es un proxy de paso didáctico (reenvía método, query, body y content-type).
  * Para producción se usaría un gateway real; acá basta para el flujo del caso.

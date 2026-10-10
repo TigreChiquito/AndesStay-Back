@@ -21,6 +21,7 @@ No tiene base de datos ni mensajería.
 | `/api/units/**` | `units` | `http://catalog:8082` |
 | `/api/reports/**` | `reports` | `http://report:8084` |
 | `/api/audit/**` | `audit` | `http://audit:8085` |
+| `/api/notifications/**` | `notifications` | `http://notify:8083` |
 
 Reenvía el método, el path completo, el query string, el body y el `Content-Type`. Si el micro responde con error 4xx o 5xx, el BFF lo devuelve tal cual. Además:
 
@@ -36,7 +37,7 @@ El BFF no reenvía el header `Authorization`. En su lugar, agrega dos headers a 
 | `X-User-Id` | Claim `oid` del token: el id del usuario en Azure AD, igual al `localAccountId` de MSAL |
 | `X-User-Roles` | App Roles separados por coma, por ejemplo `Cliente` o `Recepcionista,Admin` |
 
-Los micros los usan para reglas de pertenencia; por ejemplo, reservations solo deja que un Cliente cancele sus propias reservas. Los headers que mande el cliente **nunca** se reenvían, así que no se pueden falsificar desde fuera. Eso sí, los micros confían en la red interna de Docker: cualquiera con acceso directo a ella podría mandarlos.
+Los micros los usan para reglas de pertenencia: reservations solo deja que un Cliente cancele sus propias reservas, y notify devuelve a cada usuario solo sus avisos. Los headers que mande el cliente **nunca** se reenvían, así que no se pueden falsificar desde fuera. Eso sí, los micros confían en la red interna de Docker: cualquiera con acceso directo a ella podría mandarlos.
 
 ## Autorización por rol
 
@@ -54,6 +55,7 @@ Definida en [`SecurityConfig`](src/main/java/cl/tigrechiquito/ms_andesstay_bff/c
 | `/api/reservations/**` | GET | Cualquier usuario autenticado |
 | `/api/reports/**` | todos | `Admin` |
 | `/api/audit/**` | todos | `Auditor`, `Admin` |
+| `/api/notifications/**` | todos | Autenticado (notify filtra por usuario y rol) |
 | cualquier otra | todos | Autenticado |
 
 Sin token, o con un token inválido, la respuesta es **401**; el motivo exacto viene en el header `WWW-Authenticate`. Con un token válido pero sin el rol necesario, la respuesta es **403**.
@@ -89,6 +91,7 @@ Métodos: `GET, POST, PUT, DELETE, PATCH, OPTIONS`. Headers: `Authorization, Con
 | `gateway.routes.units` | `GATEWAY_ROUTES_UNITS` | `http://localhost:8082` |
 | `gateway.routes.reports` | `GATEWAY_ROUTES_REPORTS` | `http://localhost:8084` |
 | `gateway.routes.audit` | `GATEWAY_ROUTES_AUDIT` | `http://localhost:8085` |
+| `gateway.routes.notifications` | `GATEWAY_ROUTES_NOTIFICATIONS` | `http://localhost:8083` |
 | issuer / audiencia | `AZURE_TENANT_ID`, `AZURE_API_CLIENT_ID` | — (obligatorias) |
 | `cors.allowed-origins` | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` |
 

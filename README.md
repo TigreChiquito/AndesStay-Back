@@ -18,15 +18,16 @@ Backend de **AndesStay**, una plataforma de reservas de hospedaje (hostales, cab
 │        ├──▶ reservations :8081 ──REST──▶ catalog :8082    │
 │        ├──▶ catalog      :8082                            │
 │        ├──▶ report       :8084                            │
-│        └──▶ audit        :8085                            │
+│        ├──▶ audit        :8085                            │
+│        └──▶ notify       :8083 (avisos; consume RabbitMQ) │
 │                                                           │
-│  notify :8083 (solo consumidor)   Postgres :5432          │
+│  Postgres :5432                                           │
 └──────────────┬──────────────────────────┬─────────────────┘
                │ AMQP 5672                │ Kafka 9092-9094
                ▼                          ▼
 ┌──────── ec2-mq ────────┐   ┌──────────── ec2-kafka ────────────┐
 │ RabbitMQ (2 nodos)     │   │ Zookeeper ×3 + Kafka ×3 + Kafka UI │
-│ comandos → notify      │   │ reservations.events → report/audit │
+│ avisos → notify        │   │ reservations.events → report/audit │
 └────────────────────────┘   └────────────────────────────────────┘
 ```
 
@@ -34,7 +35,7 @@ El sistema sigue un estilo **orientado a eventos**:
 
 - **REST (síncrono):** solo cuando se necesita una respuesta inmediata. El front habla con el BFF, y reservations le pide a catalog que descuente o devuelva un cupo.
 - **Kafka (`reservations.events`)** — *"esto pasó"*: fuente de verdad de todo lo que le ocurre a una reserva (creación y cambios de estado). La consumen report y audit, cada uno con su propio `group-id` (fan-out).
-- **RabbitMQ (`cmd.direct` / `cmd.topic` + DLX)** — *"haz esto"*: comandos puntuales (email, voucher, housekeeping) que reservations dispara ante ciertos cambios de estado. Los consume notify, con dead-letter queues para los mensajes que fallan.
+- **RabbitMQ (`cmd.direct` / `cmd.topic` + DLX)** — *"haz esto"*: comandos que reservations dispara al crear una reserva o cambiar su estado: avisos al huésped, avisos al personal (housekeeping) y vouchers. Los consume notify, que guarda los avisos para mostrarlos en la campanita del front, con dead-letter queues para los mensajes que fallan.
 
 ## Estructura del repositorio
 
@@ -44,7 +45,7 @@ El sistema sigue un estilo **orientado a eventos**:
 | [`ec2-apps/ms-andesstay-bff/`](ec2-apps/ms-andesstay-bff/README.md) | EC2 #1 | Seguridad (Azure AD) y enrutado hacia los micros | [ver](ec2-apps/ms-andesstay-bff/README.md) |
 | [`ec2-apps/ms-andesstay-reservations/`](ec2-apps/ms-andesstay-reservations/README.md) | EC2 #1 | Ciclo de vida de la reserva; productor Kafka y RabbitMQ | [ver](ec2-apps/ms-andesstay-reservations/README.md) |
 | [`ec2-apps/ms-andesstay-catalog/`](ec2-apps/ms-andesstay-catalog/README.md) | EC2 #1 | Unidades de hospedaje y cupos | [ver](ec2-apps/ms-andesstay-catalog/README.md) |
-| [`ec2-apps/ms-andesstay-notify/`](ec2-apps/ms-andesstay-notify/README.md) | EC2 #1 | Consumidor RabbitMQ: email, voucher, housekeeping | [ver](ec2-apps/ms-andesstay-notify/README.md) |
+| [`ec2-apps/ms-andesstay-notify/`](ec2-apps/ms-andesstay-notify/README.md) | EC2 #1 | Consumidor RabbitMQ: avisos in-app al huésped y al personal, voucher | [ver](ec2-apps/ms-andesstay-notify/README.md) |
 | [`ec2-apps/ms-andesstay-report/`](ec2-apps/ms-andesstay-report/README.md) | EC2 #1 | Read model de KPIs alimentado por Kafka (CQRS) | [ver](ec2-apps/ms-andesstay-report/README.md) |
 | [`ec2-apps/ms-andesstay-audit/`](ec2-apps/ms-andesstay-audit/README.md) | EC2 #1 | Historial append-only alimentado por Kafka | [ver](ec2-apps/ms-andesstay-audit/README.md) |
 | [`ec2-apps/postgres-init/`](ec2-apps/postgres-init/README.md) | EC2 #1 | Script que crea las bases al iniciar Postgres | [ver](ec2-apps/postgres-init/README.md) |
@@ -61,7 +62,7 @@ El sistema sigue un estilo **orientado a eventos**:
 | `ms-andesstay-bff` | 8080 (público) | — | Resource server JWT + gateway hacia los micros |
 | `ms-andesstay-reservations` | 8081 | `reservations_db` | Máquina de estados; publica a Kafka y RabbitMQ |
 | `ms-andesstay-catalog` | 8082 | `catalog_db` | CRUD de unidades y control de cupos |
-| `ms-andesstay-notify` | 8083 | — | Consumidor RabbitMQ (ACK/NACK manual + DLQ) |
+| `ms-andesstay-notify` | 8083 | `notify_db` | Consumidor RabbitMQ → avisos in-app (ACK/NACK manual + DLQ) |
 | `ms-andesstay-report` | 8084 | `report_db` | Consumidor Kafka → KPIs |
 | `ms-andesstay-audit` | 8085 | `audit_db` | Consumidor Kafka → línea de tiempo |
 

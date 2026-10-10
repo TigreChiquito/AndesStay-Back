@@ -6,7 +6,7 @@ import java.util.UUID;
 /**
  * Envelope común de la pauta (sección 8): metadatos estándar + payload.
  *
- * @param type          tipo de comando/evento (ej. "email.confirmation")
+ * @param type          tipo de comando/evento (ej. "notification.confirmed")
  * @param eventId       id único del mensaje; sirve al consumidor para idempotencia
  * @param timestamp     momento de emisión
  * @param traceId       correlación de la traza distribuida

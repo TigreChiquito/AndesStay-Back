@@ -11,7 +11,7 @@ RabbitMQ y Kafka **no** viven aquí: están en [ec2-mq](../ec2-mq/README.md) y [
 | [`ms-andesstay-bff/`](ms-andesstay-bff/README.md) | Puerta de entrada: valida el JWT de Azure AD y enruta hacia los micros |
 | [`ms-andesstay-reservations/`](ms-andesstay-reservations/README.md) | Ciclo de vida de la reserva; productor de Kafka y RabbitMQ |
 | [`ms-andesstay-catalog/`](ms-andesstay-catalog/README.md) | Unidades de hospedaje y cupos |
-| [`ms-andesstay-notify/`](ms-andesstay-notify/README.md) | Consumidor de comandos RabbitMQ |
+| [`ms-andesstay-notify/`](ms-andesstay-notify/README.md) | Avisos in-app (consumidor RabbitMQ + API) |
 | [`ms-andesstay-report/`](ms-andesstay-report/README.md) | Read model de KPIs (consumidor Kafka) |
 | [`ms-andesstay-audit/`](ms-andesstay-audit/README.md) | Historial de auditoría (consumidor Kafka) |
 | [`postgres-init/`](postgres-init/README.md) | SQL que crea las bases al inicializar Postgres |
@@ -28,10 +28,10 @@ Cada micro es un proyecto Maven **autocontenido**, sin módulo padre: tiene su p
 | `postgres` | `andesstay-postgres` | 5432 (interno) | — |
 | `reservations` | `andesstay-reservations` | 8081 (interno) | postgres, ec2-mq, ec2-kafka, catalog |
 | `catalog` | `andesstay-catalog` | 8082 (interno) | postgres |
-| `notify` | `andesstay-notify` | 8083 (interno) | ec2-mq |
+| `notify` | `andesstay-notify` | 8083 (interno) | postgres, ec2-mq |
 | `report` | `andesstay-report` | 8084 (interno) | postgres, ec2-kafka |
 | `audit` | `andesstay-audit` | 8085 (interno) | postgres, ec2-kafka |
-| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit |
+| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit, notify |
 
 Solo el BFF publica un puerto en el host: lo consume el AWS API Gateway. Los demás solo son accesibles dentro de la red de Docker, por nombre de servicio.
 

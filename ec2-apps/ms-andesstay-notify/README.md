@@ -1,76 +1,114 @@
 # ms-andesstay-notify
 
-Microservicio **consumidor de comandos** de RabbitMQ publicados por `ms-andesstay-reservations`: emails al huésped, vouchers y tickets de housekeeping.
+Microservicio de **avisos in-app**. Consume los comandos que `ms-andesstay-reservations` publica en RabbitMQ, los convierte en notificaciones guardadas en su propia base (`notify_db`) y las expone por API para la campanita del front.
 
-Es puramente consumidor: no tiene base de datos, no expone API de negocio y no produce eventos. Las acciones están **simuladas con logs**: no envía emails ni genera PDFs reales.
+## Las 3 colas
 
-## Responsabilidades
+| Cola | Para quién | Qué hace |
+|---|---|---|
+| `q.cmd.notification` | **Huésped** (Cliente) | Guarda un aviso para el dueño de la reserva (`recipientId = guestId`) |
+| `q.cmd.housekeeping` | **Personal** (Recepcionista y Admin) | Guarda un aviso en la bandeja compartida del personal |
+| `q.cmd.voucher` | — | Generación del voucher. **Pendiente:** hoy solo escribe en el log |
 
-- Consumir las colas `q.cmd.email`, `q.cmd.housekeeping` y `q.cmd.voucher`, y ejecutar la acción correspondiente.
-- **Idempotencia:** si llega dos veces el mismo `eventId` (reentrega), se ignora sin reprocesar.
-- **ACK/NACK manual:** confirma cada mensaje procesado con éxito, o lo rechaza sin *requeue* para que caiga en su DLQ.
+## Qué genera cada cambio de reserva
 
-## Qué dispara cada comando
+| Reserva | Aviso al huésped | Aviso al personal |
+|---|---|---|
+| Creada | **Recibimos tu reserva**: registrada y pendiente de confirmación | **Nueva reserva por confirmar**: quién, qué unidad y qué fechas |
+| → CONFIRMADA | **Reserva confirmada** (+ comando `voucher.gen`) | — |
+| → CHECKIN_PENDIENTE | — | **Preparar unidad X**: check-in de quién y cuándo |
+| → EN_ESTADIA | — | — |
+| → CHECKOUT | **Gracias por tu estadía** | **Limpiar unidad X** |
+| → CANCELADA | **Reserva cancelada** | **Reserva cancelada**: cuál y de quién |
 
-| Cola | Routing keys (vía `cmd.topic`) | Acción (`NotificationService`) | Lo origina |
-|---|---|---|---|
-| `q.cmd.email` | `email.*` (`email.confirmation`, `email.reminder`, `email.checkout`) | `sendEmail`: log con huésped y fechas | → CONFIRMADA, → CHECKIN_PENDIENTE, → CHECKOUT |
-| `q.cmd.voucher` | `voucher.*` (`voucher.gen`) | `generateVoucher`: log "generando PDF" | → CONFIRMADA |
-| `q.cmd.housekeeping` | `housekeeping.#` (`housekeeping.ticket`) | `createHousekeepingTicket`: log con unidad y check-in | → CHECKIN_PENDIENTE |
+Los textos se arman en [`NotificationService`](src/main/java/cl/tigrechiquito/ms_andesstay_notify/service/NotificationService.java) con los datos que trae el comando: id de la reserva, huésped, id de la unidad y fechas. El nombre de la unidad no viaja en el mensaje (vive en catalog), así que se muestra el id.
 
-Para verlo funcionar, sigue el log del contenedor:
+## API REST
 
-```bash
-docker logs -f andesstay-notify
+Base path: `/api/notifications`. A través del BFF, cualquier usuario autenticado tiene acceso, y cada uno ve solo lo suyo. La identidad llega en los headers que agrega el BFF: `X-User-Id` (el `oid` del token) y `X-User-Roles`.
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/notifications` | Últimos 50 avisos visibles, del más reciente al más antiguo |
+| `PATCH` | `/api/notifications/{id}/read` | Marca un aviso como leído. **404** si no existe o no es visible para el usuario |
+| `PATCH` | `/api/notifications/read-all` | Marca como leídos todos los avisos visibles. Responde `{"updated": n}` |
+
+**Qué ve cada usuario:**
+- **Cliente:** los avisos `GUEST` cuyo `recipientId` es su `oid`.
+- **Recepcionista / Admin:** además, todos los avisos `STAFF`. La bandeja del personal es compartida: si un recepcionista marca un aviso como leído, queda leído para todos.
+
+```json
+GET /api/notifications
+[
+  {
+    "id": 12,
+    "audience": "GUEST",
+    "type": "notification.confirmed",
+    "title": "Reserva confirmada",
+    "message": "Tu reserva #7 en la unidad 3 del 01-12-2026 al 05-12-2026 fue confirmada. ¡Te esperamos!",
+    "reservationId": 7,
+    "unitId": 3,
+    "read": false,
+    "createdAt": "2026-10-10T15:20:11Z"
+  }
+]
 ```
+
+## Modelo
+
+Tabla `notifications`:
+
+| Campo | Descripción |
+|---|---|
+| `eventId` | `eventId` del comando. **Único:** una reentrega de RabbitMQ no duplica el aviso |
+| `audience` | `GUEST` o `STAFF` |
+| `recipient_id` | `oid` del huésped si es `GUEST`; `null` si es `STAFF` |
+| `type` | Routing key que lo originó, por ejemplo `housekeeping.prepare_unit` |
+| `title`, `message` | Texto del aviso |
+| `reservationId`, `unitId` | Referencias lógicas, sin FK |
+| `is_read` | Si ya se leyó |
+| `createdAt` | Cuándo se generó |
+
+> El aviso al huésped solo sirve si la reserva se creó con `guestId` = `oid` del usuario, que es lo que manda el front. Las reservas del seed (`u-100`, `guest-123`...) no le llegan a nadie. Si el comando no trae `guestId`, se descarta con un warning.
+
+## Procesamiento de mensajes (`NotificationListener`)
+
+Hay un `@RabbitListener` por cola, con ACK manual:
+
+1. Si el `eventId` ya se procesó en esta ejecución (`ProcessedEventStore`, en memoria), hace ACK y lo ignora.
+2. Si no, ejecuta la acción. Al guardar, el service vuelve a comprobar el `eventId` en la base, así que la idempotencia se mantiene aunque notify se reinicie.
+3. Si sale bien, hace **ACK**.
+4. Si falla, hace **NACK sin requeue** y el mensaje cae en su DLQ (`q.cmd.*.dlq`) vía `cmd.dead.dlx`.
+
+No hay reintentos: un fallo manda el mensaje directo a la DLQ.
 
 ## Topología RabbitMQ
 
-notify re-declara (`RabbitConfig`) la misma topología que define reservations. La declaración es idempotente mientras los nombres y argumentos coincidan exactamente, así que cualquiera de los dos servicios puede arrancar primero.
+notify re-declara (`RabbitConfig`) la misma topología que define reservations. La declaración es idempotente mientras los nombres y argumentos coincidan, así que cualquiera de los dos puede arrancar primero.
 
 ```
-cmd.topic ──email.*──────────▶ q.cmd.email ────────┐
-          ──housekeeping.#───▶ q.cmd.housekeeping ─┤  NACK / rechazo
-          ──voucher.*────────▶ q.cmd.voucher ──────┤
-cmd.direct (email.send · housekeeping.ticket · voucher.gen, mismas colas)
+cmd.topic ──notification.*──▶ q.cmd.notification ─┐
+          ──housekeeping.#──▶ q.cmd.housekeeping ──┤  NACK
+          ──voucher.*───────▶ q.cmd.voucher ───────┤
+cmd.direct (notification.send · housekeeping.ticket · voucher.gen, mismas colas)
                                                    ▼
-                      cmd.dead.dlx ──▶ q.cmd.email.dlq · q.cmd.housekeeping.dlq · q.cmd.voucher.dlq
+               cmd.dead.dlx ──▶ q.cmd.notification.dlq · q.cmd.housekeeping.dlq · q.cmd.voucher.dlq
 ```
 
-## Flujo de procesamiento (`NotificationListener`)
-
-1. Si el `eventId` del `CommandEnvelope` ya fue procesado → `ACK` y se ignora.
-2. Si no, ejecuta la acción.
-3. Si tiene éxito → marca el `eventId` como procesado y hace `ACK`.
-4. Si falla → `NACK` sin *requeue*, y el mensaje cae en su DLQ vía `cmd.dead.dlx`.
-
-Mensaje recibido (`CommandEnvelope<NotificationPayload>`):
-
-```json
-{
-  "type": "email.confirmation",
-  "eventId": "uuid",
-  "timestamp": "2026-10-05T22:43:01Z",
-  "traceId": "uuid",
-  "correlationId": "reservation-1",
-  "payload": {
-    "reservationId": 1, "guestId": "guest-123", "guestName": "Ana Pérez",
-    "unitId": 1, "checkInDate": "2026-12-01", "checkOutDate": "2026-12-05",
-    "status": "CONFIRMADA"
-  }
-}
-```
-
-> La idempotencia vive **en memoria** (`ProcessedEventStore`, un `Set` concurrente): se pierde al reiniciar el contenedor y no se comparte entre réplicas. Para producción debería persistirse (en Redis o en una tabla).
+> La cola de avisos al huésped antes se llamaba `q.cmd.email`. Tras el deploy hay que borrar `q.cmd.email` y `q.cmd.email.dlq` a mano en la Management UI. Ver [ec2-mq](../../ec2-mq/README.md).
 
 ## Estructura
 
 ```
 ms_andesstay_notify/
-├── config/      RabbitConfig (topología + JSON converter) · RabbitConstants
-├── messaging/   CommandEnvelope · NotificationPayload · ProcessedEventStore
-├── service/     NotificationService
-└── listener/    NotificationListener (un @RabbitListener por cola, ACK/NACK manual)
+├── config/       RabbitConfig (topología + JSON converter) · RabbitConstants
+├── messaging/    CommandEnvelope · NotificationPayload · ProcessedEventStore
+├── listener/     NotificationListener (un @RabbitListener por cola, ACK/NACK manual)
+├── domain/       Notification · Audience · NotificationNotFoundException
+├── repository/   NotificationRepository
+├── dto/          NotificationResponse
+├── service/      NotificationService (textos de los avisos + consultas)
+└── controller/   NotificationController · GlobalExceptionHandler
 ```
 
 ## Configuración
@@ -80,14 +118,18 @@ ms_andesstay_notify/
 | Propiedad | Default | Variable en el compose |
 |---|---|---|
 | `server.port` | `8083` | — |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/notify_db` | `SPRING_DATASOURCE_URL` |
+| `spring.datasource.password` | `andesstay` | `SPRING_DATASOURCE_PASSWORD` |
 | `spring.rabbitmq.host` / `port` | `localhost:5672` | `SPRING_RABBITMQ_HOST` / `_PORT` |
 | `spring.rabbitmq.username` / `password` | `andesstay` / `andesstay` | `SPRING_RABBITMQ_USERNAME` / `_PASSWORD` |
 | `spring.rabbitmq.listener.simple.acknowledge-mode` | `manual` | — |
 | `...listener.simple.concurrency` / `max-concurrency` | `1` / `3` | — |
 
+`ddl-auto: update` crea la tabla `notifications` en el primer arranque. La base `notify_db` la crea [`postgres-init`](../postgres-init/README.md); si el volumen de Postgres ya existía, hay que crearla a mano.
+
 ## Ejecutar localmente
 
-Requiere RabbitMQ en `localhost:5672` con el usuario `andesstay`. El usuario `guest` solo conecta desde el localhost del contenedor.
+Requiere PostgreSQL (`notify_db`) y RabbitMQ en `localhost:5672`, con el usuario `andesstay`.
 
 ```bash
 ./mvnw spring-boot:run

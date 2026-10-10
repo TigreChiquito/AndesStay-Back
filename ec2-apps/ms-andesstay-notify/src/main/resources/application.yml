@@ -2,6 +2,16 @@ spring:
   application:
     name: ms-andesstay-notify
 
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notify_db
+    username: andesstay
+    password: ${DB_PASSWORD:andesstay}
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # crea/actualiza la tabla notifications
+    open-in-view: false
+
   rabbitmq:
     host: localhost
     port: 5672

@@ -1,6 +1,6 @@
 # ec2-mq — Máquina 2: RabbitMQ
 
-Clúster **RabbitMQ de 2 nodos** con Management UI. Transporta los **comandos** ("haz esto") que `ms-andesstay-reservations` publica y que `ms-andesstay-notify` consume: emails, vouchers y tickets de housekeeping.
+Clúster **RabbitMQ de 2 nodos** con Management UI. Transporta los **comandos** ("haz esto") que `ms-andesstay-reservations` publica y que `ms-andesstay-notify` consume: avisos al huésped, avisos al personal (housekeeping) y vouchers.
 
 Usa imágenes oficiales (`rabbitmq:3-management`), sin código propio.
 
@@ -57,7 +57,9 @@ cp .env.example .env
 La topología **no** se define aquí: la declaran los propios micros al arrancar (reservations y notify, de forma idempotente). Ver el detalle en [ms-andesstay-notify](../ec2-apps/ms-andesstay-notify/README.md#topología-rabbitmq).
 
 - Exchanges: `cmd.direct`, `cmd.topic` y `cmd.dead.dlx`.
-- Colas: `q.cmd.email`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
+- Colas: `q.cmd.notification`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
+
+> **Migración desde `q.cmd.email`:** la cola de avisos al huésped se llamaba `q.cmd.email`. Tras desplegar la versión nueva, borra `q.cmd.email` y `q.cmd.email.dlq` desde la Management UI (*Queues → cola → Delete*). Ya nadie publica ni consume en ellas.
 
 ## Despliegue
 
