@@ -13,10 +13,11 @@ Microservicio de **auditoría**. Guarda un historial **inmutable** (*append-only
 
 Base path: `/api/audit`. A través del BFF, solo los roles **`Auditor`** y **`Admin`** tienen acceso.
 
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/audit/reservations/{reservationId}` | Línea de tiempo de una reserva, del evento más antiguo al más reciente |
-| `GET` | `/api/audit/events?limit=50` | Últimos `limit` eventos (por defecto 50) de todas las reservas, del más reciente al más antiguo |
+| Método | Endpoint | Para qué sirve | Acceso (vía BFF) | Respuestas |
+|---|---|---|---|---|
+| `GET` | `/api/audit/reservations/{reservationId}` | Ver la trazabilidad completa de una reserva: cada cambio de estado, en orden, del más antiguo al más reciente | Auditor, Admin | 200 (lista vacía si no hay eventos) |
+| `GET` | `/api/audit/events?limit=50` | Ver la actividad reciente de todo el sistema: los últimos `limit` eventos (50 por defecto), del más reciente al más antiguo. Lo usa la pantalla de auditoría | Auditor, Admin | 200 |
+| `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 ```json
 GET /api/audit/reservations/1

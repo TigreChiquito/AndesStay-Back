@@ -11,6 +11,18 @@ No tiene base de datos ni mensajería.
 - **Gateway:** reenvía `/api/<segmento>/**` al micro configurado para ese segmento.
 - **CORS** para el front, que corre en otro origen.
 
+## Endpoints
+
+El BFF no tiene lógica de negocio: sus endpoints son la salud del servicio y el proxy hacia los micros.
+
+| Método | Endpoint | Para qué sirve | Acceso | Respuestas |
+|---|---|---|---|---|
+| `GET` | `/actuator/health` | Indica si el BFF está arriba. Se puede consultar desde fuera: `<api-gateway>/actuator/health` | Público | 200 `{"status":"UP"}` |
+| `GET` | `/actuator/info` | Información básica del servicio | Público | 200 |
+| todos | `/api/**` | Reenvía la petición al micro que corresponde según la tabla de abajo, después de validar el token y el rol | Según la [tabla de roles](#autorización-por-rol) | La del micro; 401/403 si falla la seguridad; 404 si no hay ruta; 502 si el micro no responde |
+
+Los endpoints de negocio están documentados en el README de cada micro: [reservations](../ms-andesstay-reservations/README.md#api-rest), [catalog](../ms-andesstay-catalog/README.md#api-rest), [report](../ms-andesstay-report/README.md#api-rest), [audit](../ms-andesstay-audit/README.md#api-rest) y [notify](../ms-andesstay-notify/README.md#api-rest).
+
 ## Enrutado
 
 [`GatewayController`](src/main/java/cl/tigrechiquito/ms_andesstay_bff/controller/GatewayController.java) toma el primer segmento después de `/api/` y busca su URL base en `gateway.routes`:

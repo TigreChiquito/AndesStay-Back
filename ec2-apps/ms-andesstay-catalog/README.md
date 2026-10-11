@@ -34,15 +34,16 @@ Microservicio dueño del **catálogo de unidades de hospedaje** (hostales, caba�
 
 Base path: `/api/units`
 
-| Método | Endpoint | Respuesta |
-|---|---|---|
-| `POST` | `/api/units` | **201**. La unidad nace activa y con `availableSlots = totalSlots` |
-| `GET` | `/api/units/{id}` | 200, o 404 |
-| `GET` | `/api/units?type=&available=` | 200. `type` es opcional; `available=true` devuelve solo las activas con cupo > 0 |
-| `PUT` | `/api/units/{id}` | 200. Actualiza todos los campos editables; requiere `active` |
-| `DELETE` | `/api/units/{id}` | **204**. Borrado físico |
-| `POST` | `/api/units/{id}/reserve` | 200, o 409 sin cupo. Lo usa reservations al confirmar |
-| `POST` | `/api/units/{id}/release` | 200. Lo usa reservations al cancelar o hacer checkout |
+| Método | Endpoint | Para qué sirve | Acceso (vía BFF) | Respuestas |
+|---|---|---|---|---|
+| `POST` | `/api/units` | Dar de alta una unidad. Nace activa y con todos sus cupos libres (`availableSlots = totalSlots`) | Admin | **201** + `Location`; 400 si el payload es inválido |
+| `GET` | `/api/units` | Listar el catálogo. Filtros opcionales: `type` (`HOSTAL`, `CABANA`, `LODGE`) y `available=true` (solo activas con cupo) | Autenticado | 200 |
+| `GET` | `/api/units/{id}` | Ver el detalle de una unidad | Autenticado | 200; 404 si no existe |
+| `PUT` | `/api/units/{id}` | Editar una unidad: nombre, tipo, ubicación, tarifa, cupo total y si está activa. Reajusta los cupos disponibles | Admin | 200; 400; 404 |
+| `DELETE` | `/api/units/{id}` | Eliminar una unidad (borrado físico) | Admin | **204**; 404 |
+| `POST` | `/api/units/{id}/reserve` | Descontar un cupo. Lo llama reservations al confirmar una reserva | Interno (reservations) | 200; 409 sin cupo o por conflicto de concurrencia |
+| `POST` | `/api/units/{id}/release` | Devolver un cupo. Lo llama reservations al cancelar una reserva confirmada o al hacer checkout | Interno (reservations) | 200; 404 |
+| `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 ```json
 POST /api/units

@@ -27,11 +27,12 @@ Los textos se arman en [`NotificationService`](src/main/java/cl/tigrechiquito/ms
 
 Base path: `/api/notifications`. A través del BFF, cualquier usuario autenticado tiene acceso, y cada uno ve solo lo suyo. La identidad llega en los headers que agrega el BFF: `X-User-Id` (el `oid` del token) y `X-User-Roles`.
 
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/notifications` | Últimos 50 avisos visibles, del más reciente al más antiguo |
-| `PATCH` | `/api/notifications/{id}/read` | Marca un aviso como leído. **404** si no existe o no es visible para el usuario |
-| `PATCH` | `/api/notifications/read-all` | Marca como leídos todos los avisos visibles. Responde `{"updated": n}` |
+| Método | Endpoint | Para qué sirve | Acceso (vía BFF) | Respuestas |
+|---|---|---|---|---|
+| `GET` | `/api/notifications` | Listar los avisos del usuario (los últimos 50, del más reciente al más antiguo). La campanita del front lo consulta cada 30 s | Autenticado (cada uno ve los suyos) | 200 |
+| `PATCH` | `/api/notifications/{id}/read` | Marcar un aviso como leído, al hacer clic en él | Autenticado | 200; 404 si no existe o no es visible para el usuario |
+| `PATCH` | `/api/notifications/read-all` | Marcar como leídos todos los avisos visibles ("Marcar todas como leídas") | Autenticado | 200 `{"updated": n}` |
+| `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 **Qué ve cada usuario:**
 - **Cliente:** los avisos `GUEST` cuyo `recipientId` es su `oid`.

@@ -34,13 +34,14 @@ CREADA ──▶ CONFIRMADA ──▶ CHECKIN_PENDIENTE ──▶ EN_ESTADIA ─
 
 Base path: `/api/reservations`
 
-| Método | Endpoint | Respuesta |
-|---|---|---|
-| `POST` | `/api/reservations` | **201** + `Location`. La reserva nace en `CREADA` |
-| `GET` | `/api/reservations/{id}` | 200, o 404 |
-| `PUT` | `/api/reservations/{id}/status` | 200, o 409 si la transición es inválida o no hay cupo |
-| `POST` | `/api/reservations/{id}/cancel` | 200; 403 si un huésped intenta cancelar una reserva ajena; 409 si ya no es cancelable |
-| `GET` | `/api/reservations?status=&from=&to=` | 200. Filtros opcionales; `from`/`to` filtran por fecha de check-in y deben ir juntos |
+| Método | Endpoint | Para qué sirve | Acceso (vía BFF) | Respuestas |
+|---|---|---|---|---|
+| `POST` | `/api/reservations` | Crear una reserva nueva. Nace en `CREADA`, todavía sin descontar cupo, y genera avisos al huésped y al personal | Cliente, Recepcionista, Admin | **201** + `Location`; 400 si el payload es inválido |
+| `GET` | `/api/reservations` | Listar reservas, con filtros opcionales `status`, `from` y `to` (fecha de check-in; `from` y `to` deben ir juntos). Lo usan los listados del front | Autenticado | 200 |
+| `GET` | `/api/reservations/{id}` | Ver el detalle de una reserva | Autenticado | 200; 404 si no existe |
+| `PUT` | `/api/reservations/{id}/status` | Hacer avanzar la reserva por la máquina de estados: confirmar, check-in, estadía, checkout o cancelar. Coordina el cupo con catalog | Recepcionista, Admin | 200; 409 si la transición es inválida o no hay cupo; 503 si catalog no responde |
+| `POST` | `/api/reservations/{id}/cancel` | Cancelar una reserva. El personal puede cancelar cualquiera; el huésped, solo las suyas | Cliente, Recepcionista, Admin | 200; 403 si la reserva es ajena; 409 si ya no es cancelable |
+| `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 ```json
 POST /api/reservations

@@ -12,11 +12,12 @@ Microservicio de **reportería**. Mantiene un *read model* propio con el estado 
 
 Base path: `/api/reports`. A través del BFF, solo el rol **`Admin`** tiene acceso.
 
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/reports/summary` | Resumen completo (ver abajo) |
-| `GET` | `/api/reports/by-status` | Mapa `estado → cantidad` |
-| `GET` | `/api/reports/by-unit` | Lista `[{unitId, total}]` |
+| Método | Endpoint | Para qué sirve | Acceso (vía BFF) | Respuestas |
+|---|---|---|---|---|
+| `GET` | `/api/reports/summary` | Obtener todos los KPIs de una vez: total de reservas, estadías activas, conteo por estado y por unidad. Lo usa el dashboard | Admin | 200 (ver ejemplo abajo) |
+| `GET` | `/api/reports/by-status` | Saber cuántas reservas hay en cada estado, por ejemplo para un gráfico de torta | Admin | 200 `{"CONFIRMADA": 4, ...}` |
+| `GET` | `/api/reports/by-unit` | Saber cuántas reservas tiene cada unidad, para ver las más demandadas | Admin | 200 `[{"unitId": 1, "total": 2}]` |
+| `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 ```json
 GET /api/reports/summary
