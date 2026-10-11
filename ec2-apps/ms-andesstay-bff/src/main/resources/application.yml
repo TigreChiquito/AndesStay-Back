@@ -24,6 +24,7 @@ gateway:
     reports: http://localhost:8084
     audit: http://localhost:8085
     notifications: http://localhost:8083
+    vouchers: http://localhost:8083
 
 management:
   endpoints:

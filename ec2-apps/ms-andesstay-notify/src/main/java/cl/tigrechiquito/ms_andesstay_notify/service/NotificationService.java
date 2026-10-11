@@ -22,7 +22,7 @@ import cl.tigrechiquito.ms_andesstay_notify.repository.NotificationRepository;
  *
  *   q.cmd.notification -> aviso al huésped (GUEST, recipientId = guestId)
  *   q.cmd.housekeeping -> aviso al personal (STAFF: Recepcionista/Admin)
- *   q.cmd.voucher      -> generación del voucher (pendiente: solo log)
+ *   (q.cmd.voucher lo atiende VoucherService)
  */
 @Service
 public class NotificationService {
@@ -98,12 +98,6 @@ public class NotificationService {
                     "La reserva #" + p.reservationId() + " está en estado " + p.status() + "." };
         };
         save(env, Audience.STAFF, null, text[0], text[1]);
-    }
-
-    public void generateVoucher(CommandEnvelope<NotificationPayload> env) {
-        NotificationPayload p = env.payload();
-        log.info("VOUCHER [{}] -> generando PDF de la reserva {} (unidad {})",
-                env.type(), p.reservationId(), p.unitId());
     }
 
     // --- API ---

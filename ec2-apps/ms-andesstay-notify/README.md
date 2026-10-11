@@ -1,6 +1,6 @@
 # ms-andesstay-notify
 
-Microservicio de **avisos in-app**. Consume los comandos que `ms-andesstay-reservations` publica en RabbitMQ, los convierte en notificaciones guardadas en su propia base (`notify_db`) y las expone por API para la campanita del front.
+Microservicio de **avisos in-app y vouchers**. Consume los comandos que `ms-andesstay-reservations` publica en RabbitMQ. Con ellos guarda notificaciones en su propia base (`notify_db`), que la campanita del front consulta por API, y genera el **voucher en PDF** de cada reserva confirmada.
 
 ## Las 3 colas
 
@@ -8,7 +8,7 @@ Microservicio de **avisos in-app**. Consume los comandos que `ms-andesstay-reser
 |---|---|---|
 | `q.cmd.notification` | **Huésped** (Cliente) | Guarda un aviso para el dueño de la reserva (`recipientId = guestId`) |
 | `q.cmd.housekeeping` | **Personal** (Recepcionista y Admin) | Guarda un aviso en la bandeja compartida del personal |
-| `q.cmd.voucher` | — | Generación del voucher. **Pendiente:** hoy solo escribe en el log |
+| `q.cmd.voucher` | **Huésped** (y el personal) | Genera el voucher en PDF de la reserva confirmada y lo guarda para descargarlo |
 
 ## Qué genera cada cambio de reserva
 
@@ -32,6 +32,7 @@ Base path: `/api/notifications`. A través del BFF, cualquier usuario autenticad
 | `GET` | `/api/notifications` | Listar los avisos del usuario (los últimos 50, del más reciente al más antiguo). La campanita del front lo consulta cada 30 s | Autenticado (cada uno ve los suyos) | 200 |
 | `PATCH` | `/api/notifications/{id}/read` | Marcar un aviso como leído, al hacer clic en él | Autenticado | 200; 404 si no existe o no es visible para el usuario |
 | `PATCH` | `/api/notifications/read-all` | Marcar como leídos todos los avisos visibles ("Marcar todas como leídas") | Autenticado | 200 `{"updated": n}` |
+| `GET` | `/api/vouchers/{reservationId}` | Descargar el voucher en PDF de una reserva confirmada | Autenticado (el huésped, los suyos; Recepcionista/Admin, cualquiera) | 200 `application/pdf` con `Content-Disposition: attachment; filename="voucher-AS-000007.pdf"`; 404 si no existe o no es visible |
 | `GET` | `/actuator/health` | Indica si el micro está arriba; lo usan los healthchecks | Interno (red de Docker) | 200 `{"status":"UP"}` |
 
 **Qué ve cada usuario:**
@@ -55,6 +56,21 @@ GET /api/notifications
 ]
 ```
 
+## Voucher
+
+Cuando una reserva pasa a **CONFIRMADA**, reservations publica `voucher.gen` y notify (`VoucherService`):
+
+1. Si la reserva ya tiene voucher, no hace nada (idempotente por `reservationId`).
+2. Le pide a catalog (`GET /api/units/{id}`) el nombre, la ubicación y la tarifa de la unidad. Es *best effort*: timeout de 3 s, y si catalog no responde, el voucher se emite igual, solo con el número de unidad y sin montos.
+3. Calcula las noches y el total (tarifa × noches).
+4. Genera el PDF con **OpenPDF 2.0.5** (`VoucherPdfGenerator`) y lo guarda en la tabla `vouchers`, como bytes.
+
+El PDF incluye el código (`AS-` + id de la reserva con 6 dígitos, por ejemplo `AS-000007`), la fecha de emisión, el huésped, el número de reserva, la unidad y su ubicación, el check-in, el check-out, las noches, la tarifa por noche y el total.
+
+> **OpenPDF 2.0.5** es la última versión compilada para Java 17. Desde la 2.1.0 la librería requiere Java 21, y fallaría al arrancar con `UnsupportedClassVersionError`. No la actualices sin pasar antes el proyecto a Java 21.
+
+Como el PDF queda guardado, descargarlo no depende de catalog. Se conserva aunque la reserva se cancele después.
+
 ## Modelo
 
 Tabla `notifications`:
@@ -69,6 +85,18 @@ Tabla `notifications`:
 | `reservationId`, `unitId` | Referencias lógicas, sin FK |
 | `is_read` | Si ya se leyó |
 | `createdAt` | Cuándo se generó |
+
+Tabla `vouchers`:
+
+| Campo | Descripción |
+|---|---|
+| `reservationId` | Reserva a la que pertenece. **Único**: un voucher por reserva |
+| `code` | Código legible, por ejemplo `AS-000007` (único) |
+| `guestId` | `oid` del huésped: define quién puede descargarlo |
+| `guestName`, `unitId`, `checkInDate`, `checkOutDate` | Datos de la reserva al momento de emitirlo |
+| `total` | Total de la estadía; `null` si catalog no respondió |
+| `pdf` | El documento (`bytea`, unos 2 KB) |
+| `createdAt` | Cuándo se emitió |
 
 > El aviso al huésped solo sirve si la reserva se creó con `guestId` = `oid` del usuario, que es lo que manda el front. Las reservas del seed (`u-100`, `guest-123`...) no le llegan a nadie. Si el comando no trae `guestId`, se descarta con un warning.
 
@@ -105,11 +133,12 @@ ms_andesstay_notify/
 ├── config/       RabbitConfig (topología + JSON converter) · RabbitConstants
 ├── messaging/    CommandEnvelope · NotificationPayload · ProcessedEventStore
 ├── listener/     NotificationListener (un @RabbitListener por cola, ACK/NACK manual)
-├── domain/       Notification · Audience · NotificationNotFoundException
-├── repository/   NotificationRepository
+├── client/       CatalogClient · UnitInfo (datos de la unidad para el voucher)
+├── domain/       Notification · Audience · Voucher · *NotFoundException
+├── repository/   NotificationRepository · VoucherRepository
 ├── dto/          NotificationResponse
-├── service/      NotificationService (textos de los avisos + consultas)
-└── controller/   NotificationController · GlobalExceptionHandler
+├── service/      NotificationService (avisos) · VoucherService · VoucherPdfGenerator (PDF)
+└── controller/   NotificationController · VoucherController · RequestUser · GlobalExceptionHandler
 ```
 
 ## Configuración
@@ -123,14 +152,15 @@ ms_andesstay_notify/
 | `spring.datasource.password` | `andesstay` | `SPRING_DATASOURCE_PASSWORD` |
 | `spring.rabbitmq.host` / `port` | `localhost:5672` | `SPRING_RABBITMQ_HOST` / `_PORT` |
 | `spring.rabbitmq.username` / `password` | `andesstay` / `andesstay` | `SPRING_RABBITMQ_USERNAME` / `_PASSWORD` |
+| `catalog.base-url` | `http://localhost:8082` | `CATALOG_BASE_URL` |
 | `spring.rabbitmq.listener.simple.acknowledge-mode` | `manual` | — |
 | `...listener.simple.concurrency` / `max-concurrency` | `1` / `3` | — |
 
-`ddl-auto: update` crea la tabla `notifications` en el primer arranque. La base `notify_db` la crea [`postgres-init`](../postgres-init/README.md); si el volumen de Postgres ya existía, hay que crearla a mano.
+`ddl-auto: update` crea las tablas `notifications` y `vouchers` en el primer arranque. La base `notify_db` la crea [`postgres-init`](../postgres-init/README.md); si el volumen de Postgres ya existía, hay que crearla a mano.
 
 ## Ejecutar localmente
 
-Requiere PostgreSQL (`notify_db`) y RabbitMQ en `localhost:5672`, con el usuario `andesstay`.
+Requiere PostgreSQL (`notify_db`) y RabbitMQ en `localhost:5672`, con el usuario `andesstay`. catalog es opcional: sin él, los vouchers salen sin nombre de unidad ni montos.
 
 ```bash
 ./mvnw spring-boot:run

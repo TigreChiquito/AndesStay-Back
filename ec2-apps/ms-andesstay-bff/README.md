@@ -21,7 +21,7 @@ El BFF no tiene lógica de negocio: sus endpoints son la salud del servicio y el
 | `GET` | `/actuator/info` | Información básica del servicio | Público | 200 |
 | todos | `/api/**` | Reenvía la petición al micro que corresponde según la tabla de abajo, después de validar el token y el rol | Según la [tabla de roles](#autorización-por-rol) | La del micro; 401/403 si falla la seguridad; 404 si no hay ruta; 502 si el micro no responde |
 
-Los endpoints de negocio están documentados en el README de cada micro: [reservations](../ms-andesstay-reservations/README.md#api-rest), [catalog](../ms-andesstay-catalog/README.md#api-rest), [report](../ms-andesstay-report/README.md#api-rest), [audit](../ms-andesstay-audit/README.md#api-rest) y [notify](../ms-andesstay-notify/README.md#api-rest).
+Los endpoints de negocio están documentados en el README de cada micro: [reservations](../ms-andesstay-reservations/README.md#api-rest), [catalog](../ms-andesstay-catalog/README.md#api-rest), [report](../ms-andesstay-report/README.md#api-rest), [audit](../ms-andesstay-audit/README.md#api-rest) y [notify](../ms-andesstay-notify/README.md#api-rest) (avisos y vouchers).
 
 ## Enrutado
 
@@ -34,8 +34,9 @@ Los endpoints de negocio están documentados en el README de cada micro: [reserv
 | `/api/reports/**` | `reports` | `http://report:8084` |
 | `/api/audit/**` | `audit` | `http://audit:8085` |
 | `/api/notifications/**` | `notifications` | `http://notify:8083` |
+| `/api/vouchers/**` | `vouchers` | `http://notify:8083` |
 
-Reenvía el método, el path completo, el query string, el body y el `Content-Type`. Si el micro responde con error 4xx o 5xx, el BFF lo devuelve tal cual. Además:
+Reenvía el método, el path completo, el query string, el body y el `Content-Type`. De la respuesta conserva el `Content-Type` y el `Content-Disposition`; este último sirve para que el PDF del voucher se descargue con su nombre. Si el micro responde con error 4xx o 5xx, el BFF lo devuelve tal cual. Además:
 
 - **404** si el segmento no tiene ruta configurada.
 - **502** (sin cuerpo) si el micro de destino no responde: está caído, reiniciándose o no resuelve por nombre.
@@ -68,6 +69,7 @@ Definida en [`SecurityConfig`](src/main/java/cl/tigrechiquito/ms_andesstay_bff/c
 | `/api/reports/**` | todos | `Admin` |
 | `/api/audit/**` | todos | `Auditor`, `Admin` |
 | `/api/notifications/**` | todos | Autenticado (notify filtra por usuario y rol) |
+| `/api/vouchers/**` | GET | Autenticado (notify valida que el voucher sea del usuario, salvo para el personal) |
 | cualquier otra | todos | Autenticado |
 
 Sin token, o con un token inválido, la respuesta es **401**; el motivo exacto viene en el header `WWW-Authenticate`. Con un token válido pero sin el rol necesario, la respuesta es **403**.
@@ -104,6 +106,7 @@ Métodos: `GET, POST, PUT, DELETE, PATCH, OPTIONS`. Headers: `Authorization, Con
 | `gateway.routes.reports` | `GATEWAY_ROUTES_REPORTS` | `http://localhost:8084` |
 | `gateway.routes.audit` | `GATEWAY_ROUTES_AUDIT` | `http://localhost:8085` |
 | `gateway.routes.notifications` | `GATEWAY_ROUTES_NOTIFICATIONS` | `http://localhost:8083` |
+| `gateway.routes.vouchers` | `GATEWAY_ROUTES_VOUCHERS` | `http://localhost:8083` |
 | issuer / audiencia | `AZURE_TENANT_ID`, `AZURE_API_CLIENT_ID` | — (obligatorias) |
 | `cors.allowed-origins` | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` |
 

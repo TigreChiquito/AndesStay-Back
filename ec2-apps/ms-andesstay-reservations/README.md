@@ -143,7 +143,7 @@ Este servicio es dueño de la topología (`RabbitTopologyConfig`). notify la re-
 | CHECKOUT | `notification.checkout` | `housekeeping.clean_unit` | — |
 | CANCELADA | `notification.cancelled` | `housekeeping.reservation_cancelled` | — |
 
-Lo que hace notify con cada uno está en su [README](../ms-andesstay-notify/README.md).
+Lo que hace notify con cada uno está en su [README](../ms-andesstay-notify/README.md). En particular, `voucher.gen` hace que notify genere el **voucher en PDF** de la reserva confirmada; el huésped lo descarga con `GET /api/vouchers/{reservationId}`.
 
 - Un fallo de RabbitMQ no se convierte en error HTTP: el cambio ya está guardado, así que el error queda en el log.
 - `spring.rabbitmq.connection-timeout: 5s`, para que un ec2-mq que no responde no deje el request colgado hasta el timeout de 30 s del API Gateway.

@@ -63,6 +63,8 @@ public class SecurityConfig {
 
                         // notificaciones: cada usuario ve las suyas (notify filtra con X-User-Id / X-User-Roles)
                         .requestMatchers("/api/notifications/**").authenticated()
+                        // vouchers: el huésped baja los suyos, el personal cualquiera (lo valida notify)
+                        .requestMatchers(HttpMethod.GET, "/api/vouchers/**").authenticated()
 
                         // audit: solo lectura Auditor (o Admin)
                         .requestMatchers("/api/audit/**").hasAnyRole("Auditor", "Admin")

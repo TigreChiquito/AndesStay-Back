@@ -26,6 +26,10 @@ spring:
 server:
   port: 8083
 
+# catalog: de aquí se sacan nombre, ubicación y tarifa de la unidad para el voucher
+catalog:
+  base-url: ${CATALOG_BASE_URL:http://localhost:8082}
+
 management:
   endpoints:
     web:

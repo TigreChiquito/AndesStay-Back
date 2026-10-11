@@ -67,6 +67,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
+      CATALOG_BASE_URL: http://catalog:8082
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_RABBITMQ_HOST: ${MQ_HOST}
@@ -123,6 +124,7 @@ services:
       GATEWAY_ROUTES_REPORTS: http://report:8084
       GATEWAY_ROUTES_AUDIT: http://audit:8085
       GATEWAY_ROUTES_NOTIFICATIONS: http://notify:8083
+      GATEWAY_ROUTES_VOUCHERS: http://notify:8083
 
 volumes:
   andesstay_pgdata:

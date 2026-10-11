@@ -1,6 +1,6 @@
 # ms-andesstay-catalog
 
-Microservicio dueño del **catálogo de unidades de hospedaje** (hostales, cabañas y lodges) y de su **disponibilidad** (cupos). reservations lo llama por REST para descontar o devolver cupos. No usa mensajería.
+Microservicio dueño del **catálogo de unidades de hospedaje** (hostales, cabañas y lodges) y de su **disponibilidad** (cupos). reservations lo llama por REST para descontar o devolver cupos, y notify lo consulta para armar el voucher. No usa mensajería.
 
 ## Responsabilidades
 
@@ -38,7 +38,7 @@ Base path: `/api/units`
 |---|---|---|---|---|
 | `POST` | `/api/units` | Dar de alta una unidad. Nace activa y con todos sus cupos libres (`availableSlots = totalSlots`) | Admin | **201** + `Location`; 400 si el payload es inválido |
 | `GET` | `/api/units` | Listar el catálogo. Filtros opcionales: `type` (`HOSTAL`, `CABANA`, `LODGE`) y `available=true` (solo activas con cupo) | Autenticado | 200 |
-| `GET` | `/api/units/{id}` | Ver el detalle de una unidad | Autenticado | 200; 404 si no existe |
+| `GET` | `/api/units/{id}` | Ver el detalle de una unidad. notify también lo usa, por la red interna, para poner nombre, ubicación y tarifa en el voucher | Autenticado | 200; 404 si no existe |
 | `PUT` | `/api/units/{id}` | Editar una unidad: nombre, tipo, ubicación, tarifa, cupo total y si está activa. Reajusta los cupos disponibles | Admin | 200; 400; 404 |
 | `DELETE` | `/api/units/{id}` | Eliminar una unidad (borrado físico) | Admin | **204**; 404 |
 | `POST` | `/api/units/{id}/reserve` | Descontar un cupo. Lo llama reservations al confirmar una reserva | Interno (reservations) | 200; 409 sin cupo o por conflicto de concurrencia |
@@ -70,7 +70,12 @@ Respuesta (`UnitResponse`): `id, name, type, location, totalSlots, availableSlot
 
 ## Acceso a través del BFF
 
-Desde el front, las lecturas (`GET`) están permitidas a cualquier usuario autenticado, y las escrituras requieren el rol `Admin`. reservations, en cambio, llama a `/reserve` y `/release` directamente por la red interna (`http://catalog:8082`), sin pasar por el BFF.
+Desde el front, las lecturas (`GET`) están permitidas a cualquier usuario autenticado, y las escrituras requieren el rol `Admin`. Los micros, en cambio, lo llaman directamente por la red interna (`http://catalog:8082`), sin pasar por el BFF:
+
+| Quién | Endpoint | Para qué |
+|---|---|---|
+| reservations | `POST /{id}/reserve`, `POST /{id}/release` | Descontar o devolver cupos al confirmar, cancelar o hacer checkout |
+| notify | `GET /{id}` | Datos de la unidad para el voucher. Si catalog no responde, el voucher sale sin nombre de unidad ni montos |
 
 ## Estructura
 

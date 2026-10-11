@@ -1,6 +1,9 @@
 package cl.tigrechiquito.ms_andesstay_notify.controller;
 
-import java.util.Arrays;
+import static cl.tigrechiquito.ms_andesstay_notify.controller.RequestUser.HEADER_USER_ID;
+import static cl.tigrechiquito.ms_andesstay_notify.controller.RequestUser.HEADER_USER_ROLES;
+import static cl.tigrechiquito.ms_andesstay_notify.controller.RequestUser.isStaff;
+
 import java.util.List;
 import java.util.Map;
 
@@ -22,9 +25,6 @@ import cl.tigrechiquito.ms_andesstay_notify.service.NotificationService;
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {
-
-    private static final String HEADER_USER_ID = "X-User-Id";
-    private static final String HEADER_USER_ROLES = "X-User-Roles";
 
     private final NotificationService service;
 
@@ -60,14 +60,5 @@ public class NotificationController {
             @RequestHeader(value = HEADER_USER_ROLES, required = false) String roles) {
 
         return Map.of("updated", service.markAllRead(userId, isStaff(roles)));
-    }
-
-    private static boolean isStaff(String roles) {
-        if (roles == null) {
-            return false;
-        }
-        return Arrays.stream(roles.split(","))
-                .map(String::trim)
-                .anyMatch(role -> role.equals("Recepcionista") || role.equals("Admin"));
     }
 }

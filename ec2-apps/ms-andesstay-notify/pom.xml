@@ -52,6 +52,13 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Generación del voucher en PDF. 2.0.5 es la última versión compilada
+		     para Java 17: desde 2.1.0 OpenPDF requiere Java 21. -->
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>2.0.5</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

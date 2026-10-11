@@ -31,6 +31,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *   /api/reports/**       -> report  (clave "reports")
  *   /api/audit/**         -> audit
  *   /api/notifications/** -> notify  (clave "notifications")
+ *   /api/vouchers/**      -> notify  (clave "vouchers")
  *
  * Es un proxy de paso didáctico (reenvía método, query, body y content-type).
  * Para producción se usaría un gateway real; acá basta para el flujo del caso.
@@ -87,7 +88,13 @@ public class GatewayController {
                     .toEntity(byte[].class);
 
             MediaType type = downstream.getHeaders().getContentType();
-            return ResponseEntity.status(downstream.getStatusCode())
+            ResponseEntity.BodyBuilder response = ResponseEntity.status(downstream.getStatusCode());
+            // descargas (ej. el PDF del voucher): conservar el nombre de archivo
+            String disposition = downstream.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            if (disposition != null) {
+                response.header(HttpHeaders.CONTENT_DISPOSITION, disposition);
+            }
+            return response
                     .contentType(type != null ? type : MediaType.APPLICATION_JSON)
                     .body(downstream.getBody());
 

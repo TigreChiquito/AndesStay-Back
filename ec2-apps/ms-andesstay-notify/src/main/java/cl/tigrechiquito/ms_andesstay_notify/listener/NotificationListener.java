@@ -16,6 +16,7 @@ import cl.tigrechiquito.ms_andesstay_notify.messaging.CommandEnvelope;
 import cl.tigrechiquito.ms_andesstay_notify.messaging.NotificationPayload;
 import cl.tigrechiquito.ms_andesstay_notify.messaging.ProcessedEventStore;
 import cl.tigrechiquito.ms_andesstay_notify.service.NotificationService;
+import cl.tigrechiquito.ms_andesstay_notify.service.VoucherService;
 
 /**
  * Consume las 3 colas de comandos. Cada método:
@@ -33,10 +34,13 @@ public class NotificationListener {
     private static final Logger log = LoggerFactory.getLogger(NotificationListener.class);
 
     private final NotificationService service;
+    private final VoucherService vouchers;
     private final ProcessedEventStore processed;
 
-    public NotificationListener(NotificationService service, ProcessedEventStore processed) {
+    public NotificationListener(NotificationService service, VoucherService vouchers,
+                                ProcessedEventStore processed) {
         this.service = service;
+        this.vouchers = vouchers;
         this.processed = processed;
     }
 
@@ -54,11 +58,11 @@ public class NotificationListener {
         handle(env, channel, tag, () -> service.notifyStaff(env));
     }
 
-    /** Generación del voucher (voucher.*). Por ahora solo se registra en el log. */
+    /** Generación del voucher en PDF (voucher.*), al confirmarse la reserva. */
     @RabbitListener(queues = RabbitConstants.QUEUE_VOUCHER)
     public void onVoucher(CommandEnvelope<NotificationPayload> env, Channel channel,
                           @Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-        handle(env, channel, tag, () -> service.generateVoucher(env));
+        handle(env, channel, tag, () -> vouchers.generate(env));
     }
 
     private void handle(CommandEnvelope<NotificationPayload> env, Channel channel, long tag,
