@@ -7,6 +7,8 @@
 > - La carpeta `dev/` no está en el repo.
 > - El **frontend** es React + Vite + MSAL, no Angular.
 > - Boot 4 también separó el `RestClient.Builder` en `spring-boot-starter-restclient`.
+> - Las colas de RabbitMQ ahora son avisos in-app: `q.cmd.email` pasó a ser `q.cmd.notification`, y **notify tiene base** (`notify_db`) y una API (`/api/notifications`).
+> - El BFF propaga la identidad a los micros (`X-User-Id`, `X-User-Roles`), y el Cliente puede cancelar sus propias reservas (`POST /api/reservations/{id}/cancel`).
 >
 > El estado actual está en el [README](README.md) raíz y en el README de cada carpeta.
 

@@ -70,7 +70,7 @@ Respuesta (`ReservationResponse`): `id, guestId, guestName, unitId, checkInDate,
 | 409 | Transición de estado inválida (incluye `from` y `to`), o la unidad no tiene cupo |
 | 503 | catalog no responde al confirmar o cancelar |
 
-> `guestId` viaja hoy en el body. Cuando se integre la identidad desde el BFF, debería sacarse del token.
+> En el `POST`, el `guestId` viaja en el body (el front manda el `localAccountId` del usuario). El BFF ya propaga la identidad en `X-User-Id`: una mejora pendiente es tomar el `guestId` de ese header, para que un cliente no pueda crear reservas a nombre de otro.
 
 ### Cancelación por el huésped (`POST /{id}/cancel`)
 

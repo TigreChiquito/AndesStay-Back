@@ -59,7 +59,12 @@ La topología **no** se define aquí: la declaran los propios micros al arrancar
 - Exchanges: `cmd.direct`, `cmd.topic` y `cmd.dead.dlx`.
 - Colas: `q.cmd.notification`, `q.cmd.housekeeping`, `q.cmd.voucher`, cada una con su `.dlq`.
 
-> **Migración desde `q.cmd.email`:** la cola de avisos al huésped se llamaba `q.cmd.email`. Tras desplegar la versión nueva, borra `q.cmd.email` y `q.cmd.email.dlq` desde la Management UI (*Queues → cola → Delete*). Ya nadie publica ni consume en ellas.
+> **Migración desde `q.cmd.email`** (ya aplicada en el despliegue actual, oct-2026): la cola de avisos al huésped se llamaba `q.cmd.email`. En un broker que todavía tenga las colas viejas, bórralas tras desplegar la versión nueva:
+>
+> ```bash
+> docker exec andesstay-rabbit1 rabbitmqctl delete_queue q.cmd.email
+> docker exec andesstay-rabbit1 rabbitmqctl delete_queue q.cmd.email.dlq
+> ```
 
 ## Despliegue
 

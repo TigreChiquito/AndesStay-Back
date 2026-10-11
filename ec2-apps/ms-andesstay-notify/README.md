@@ -95,7 +95,7 @@ cmd.direct (notification.send · housekeeping.ticket · voucher.gen, mismas cola
                cmd.dead.dlx ──▶ q.cmd.notification.dlq · q.cmd.housekeeping.dlq · q.cmd.voucher.dlq
 ```
 
-> La cola de avisos al huésped antes se llamaba `q.cmd.email`. Tras el deploy hay que borrar `q.cmd.email` y `q.cmd.email.dlq` a mano en la Management UI. Ver [ec2-mq](../../ec2-mq/README.md).
+> La cola de avisos al huésped antes se llamaba `q.cmd.email`. En el despliegue actual las colas viejas ya se borraron; para otro broker, ver la migración en [ec2-mq](../../ec2-mq/README.md).
 
 ## Estructura
 
