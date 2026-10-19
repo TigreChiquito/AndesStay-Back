@@ -86,7 +86,8 @@ Management UI: `http://<IP_EC2_MQ>:15672`, con `RABBIT_USER` / `RABBIT_PASSWORD`
 | Puerto | Origen permitido | Uso |
 |---|---|---|
 | 5672 | ec2-apps | AMQP (micros) |
-| 15672 | Tu IP (solo administración) | Management UI |
+| 15672 | ec2-apps | API de la Management UI: la usa `ms-andesstay-rabbit-admin` para listados y métricas |
+| 15672 | Tu IP (solo administración) | Management UI desde el navegador (botón del front) |
 
 ## Limitaciones conocidas
 

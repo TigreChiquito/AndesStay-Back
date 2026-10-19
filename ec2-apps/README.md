@@ -1,6 +1,6 @@
 # ec2-apps — Máquina 1: microservicios + Postgres
 
-Contiene los 6 microservicios Spring Boot de AndesStay y un contenedor PostgreSQL con una base por micro (*database-per-service*: un motor, varias bases). Todo se orquesta con [`compose.yml`](compose.yml).
+Contiene los 7 microservicios Spring Boot de AndesStay y un contenedor PostgreSQL con una base por micro (*database-per-service*: un motor, varias bases). Todo se orquesta con [`compose.yml`](compose.yml).
 
 RabbitMQ y Kafka **no** viven aquí: están en [ec2-mq](../ec2-mq/README.md) y [ec2-kafka](../ec2-kafka/README.md), y se referencian por IP mediante el `.env`.
 
@@ -14,6 +14,7 @@ RabbitMQ y Kafka **no** viven aquí: están en [ec2-mq](../ec2-mq/README.md) y [
 | [`ms-andesstay-notify/`](ms-andesstay-notify/README.md) | Avisos in-app y vouchers en PDF (consumidor RabbitMQ + API) |
 | [`ms-andesstay-report/`](ms-andesstay-report/README.md) | Read model de KPIs (consumidor Kafka) |
 | [`ms-andesstay-audit/`](ms-andesstay-audit/README.md) | Historial de auditoría (consumidor Kafka) |
+| [`ms-andesstay-rabbit-admin/`](ms-andesstay-rabbit-admin/README.md) | Administrador de RabbitMQ (topología y métricas) |
 | [`postgres-init/`](postgres-init/README.md) | SQL que crea las bases al inicializar Postgres |
 | [`sql/`](sql/README.md) | Scripts de datos de prueba |
 | `compose.yml` | Orquestación de la máquina |
@@ -31,7 +32,8 @@ Cada micro es un proyecto Maven **autocontenido**, sin módulo padre: tiene su p
 | `notify` | `andesstay-notify` | 8083 (interno) | postgres, ec2-mq (catalog opcional, para los vouchers) |
 | `report` | `andesstay-report` | 8084 (interno) | postgres, ec2-kafka |
 | `audit` | `andesstay-audit` | 8085 (interno) | postgres, ec2-kafka |
-| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit, notify |
+| `rabbit-admin` | `andesstay-rabbit-admin` | 8086 (interno) | ec2-mq (AMQP 5672 y Management API 15672) |
+| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit, notify, rabbit-admin |
 
 Solo el BFF publica un puerto en el host: lo consume el AWS API Gateway. Los demás solo son accesibles dentro de la red de Docker, por nombre de servicio.
 
@@ -48,6 +50,7 @@ cp .env.example .env
 | `MQ_HOST` | `10.0.x.x` | IP privada de ec2-mq |
 | `MQ_PORT` | `5672` | Puerto AMQP |
 | `MQ_USER` / `MQ_PASSWORD` | `andesstay` / — | Credenciales de RabbitMQ (deben coincidir con el `.env` de ec2-mq) |
+| `MQ_PUBLIC_URL` | `http://<ip-publica-ec2-mq>:15672` | Management UI que abre el botón del front (la entrega rabbit-admin) |
 | `KAFKA_BOOTSTRAP` | `10.0.x.x:9092,10.0.x.x:9093,10.0.x.x:9094` | Los 3 brokers de ec2-kafka |
 | `AZURE_TENANT_ID` | GUID | Tenant de Azure AD (lo usa el BFF) |
 | `AZURE_API_CLIENT_ID` | GUID | Client ID del App Registration de la API (lo usa el BFF) |
@@ -104,4 +107,4 @@ timeout 3 bash -c '</dev/tcp/<IP_MQ>/5672'   && echo OK || echo SIN_CONEXION
 
 ⚠️ **No usar** `docker system prune --volumes` ni `docker volume prune`: borrarían el volumen `andesstay_pgdata`, con todos los datos de Postgres.
 
-> Un disco de 8 GB (el default de EC2) queda justo para 6 builds Java + Postgres. Se recomiendan 20-30 GB en el volumen EBS.
+> Un disco de 8 GB (el default de EC2) queda justo para 7 builds Java + Postgres. Se recomiendan 20-30 GB en el volumen EBS.

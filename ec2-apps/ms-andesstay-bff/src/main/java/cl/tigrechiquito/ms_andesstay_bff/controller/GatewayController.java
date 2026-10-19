@@ -32,6 +32,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *   /api/audit/**         -> audit
  *   /api/notifications/** -> notify  (clave "notifications")
  *   /api/vouchers/**      -> notify  (clave "vouchers")
+ *   /api/admin/**         -> rabbit-admin (clave "admin", solo Admin)
  *
  * Es un proxy de paso didáctico (reenvía método, query, body y content-type).
  * Para producción se usaría un gateway real; acá basta para el flujo del caso.

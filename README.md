@@ -19,7 +19,8 @@ Backend de **AndesStay**, una plataforma de reservas de hospedaje (hostales, cab
 │        ├──▶ catalog      :8082                            │
 │        ├──▶ report       :8084                            │
 │        ├──▶ audit        :8085                            │
-│        └──▶ notify       :8083 (avisos; consume RabbitMQ) │
+│        ├──▶ notify       :8083 (avisos; consume RabbitMQ) │
+│        └──▶ rabbit-admin :8086 (solo Admin; administra MQ)│
 │                                                           │
 │  Postgres :5432                                           │
 └──────────────┬──────────────────────────┬─────────────────┘
@@ -41,13 +42,14 @@ El sistema sigue un estilo **orientado a eventos**:
 
 | Carpeta | Máquina | Contenido | README |
 |---|---|---|---|
-| [`ec2-apps/`](ec2-apps/README.md) | EC2 #1 | Los 6 microservicios Spring Boot + Postgres | [ver](ec2-apps/README.md) |
+| [`ec2-apps/`](ec2-apps/README.md) | EC2 #1 | Los 7 microservicios Spring Boot + Postgres | [ver](ec2-apps/README.md) |
 | [`ec2-apps/ms-andesstay-bff/`](ec2-apps/ms-andesstay-bff/README.md) | EC2 #1 | Seguridad (Azure AD) y enrutado hacia los micros | [ver](ec2-apps/ms-andesstay-bff/README.md) |
 | [`ec2-apps/ms-andesstay-reservations/`](ec2-apps/ms-andesstay-reservations/README.md) | EC2 #1 | Ciclo de vida de la reserva; productor Kafka y RabbitMQ | [ver](ec2-apps/ms-andesstay-reservations/README.md) |
 | [`ec2-apps/ms-andesstay-catalog/`](ec2-apps/ms-andesstay-catalog/README.md) | EC2 #1 | Unidades de hospedaje y cupos | [ver](ec2-apps/ms-andesstay-catalog/README.md) |
 | [`ec2-apps/ms-andesstay-notify/`](ec2-apps/ms-andesstay-notify/README.md) | EC2 #1 | Consumidor RabbitMQ: avisos in-app al huésped y al personal, y voucher en PDF | [ver](ec2-apps/ms-andesstay-notify/README.md) |
 | [`ec2-apps/ms-andesstay-report/`](ec2-apps/ms-andesstay-report/README.md) | EC2 #1 | Read model de KPIs alimentado por Kafka (CQRS) | [ver](ec2-apps/ms-andesstay-report/README.md) |
 | [`ec2-apps/ms-andesstay-audit/`](ec2-apps/ms-andesstay-audit/README.md) | EC2 #1 | Historial append-only alimentado por Kafka | [ver](ec2-apps/ms-andesstay-audit/README.md) |
+| [`ec2-apps/ms-andesstay-rabbit-admin/`](ec2-apps/ms-andesstay-rabbit-admin/README.md) | EC2 #1 | Administrador de RabbitMQ: crear/eliminar topología y métricas | [ver](ec2-apps/ms-andesstay-rabbit-admin/README.md) |
 | [`ec2-apps/postgres-init/`](ec2-apps/postgres-init/README.md) | EC2 #1 | Script que crea las bases al iniciar Postgres | [ver](ec2-apps/postgres-init/README.md) |
 | [`ec2-apps/sql/`](ec2-apps/sql/README.md) | EC2 #1 | Datos de prueba (seed) | [ver](ec2-apps/sql/README.md) |
 | [`ec2-mq/`](ec2-mq/README.md) | EC2 #2 | Clúster RabbitMQ de 2 nodos | [ver](ec2-mq/README.md) |
@@ -65,6 +67,7 @@ El sistema sigue un estilo **orientado a eventos**:
 | `ms-andesstay-notify` | 8083 | `notify_db` | Consumidor RabbitMQ → avisos in-app y vouchers en PDF (ACK/NACK manual + DLQ) |
 | `ms-andesstay-report` | 8084 | `report_db` | Consumidor Kafka → KPIs |
 | `ms-andesstay-audit` | 8085 | `audit_db` | Consumidor Kafka → línea de tiempo |
+| `ms-andesstay-rabbit-admin` | 8086 | — | Crear/eliminar colas, exchanges y bindings (RabbitAdmin) y métricas del clúster |
 
 Dentro de ec2-apps solo el BFF publica su puerto (8080). Los demás se comunican por la red interna de Docker usando el nombre del servicio (`http://reservations:8081`, etc.).
 
@@ -86,7 +89,7 @@ Orden recomendado:
 2. **ec2-mq**: `cp .env.example .env` y `docker compose up -d`. Ver [ec2-mq](ec2-mq/README.md).
 3. **ec2-apps**: `cp .env.example .env` (con las IPs de las otras dos máquinas y Azure AD) y `docker compose up -d --build`. Ver [ec2-apps](ec2-apps/README.md).
 
-Los Security Groups deben permitir, **desde ec2-apps**, los puertos 5672 hacia ec2-mq y 9092-9094 hacia ec2-kafka. Hacia ec2-apps, solo el 8080 desde el API Gateway.
+Los Security Groups deben permitir, **desde ec2-apps**, los puertos 5672 y 15672 hacia ec2-mq (este último lo usa el administrador) y 9092-9094 hacia ec2-kafka. Hacia ec2-apps, solo el 8080 desde el API Gateway.
 
 ## Desarrollo local
 

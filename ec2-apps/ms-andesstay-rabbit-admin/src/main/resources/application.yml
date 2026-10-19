@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: ms-andesstay-rabbit-admin
+
+  # Conexión AMQP: la usa RabbitAdmin para crear/eliminar la topología
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: andesstay
+    password: ${RABBIT_PASSWORD:andesstay}
+    connection-timeout: 5s
+
+server:
+  port: 8086
+
+# API HTTP de la Management UI (puerto 15672): listados y métricas.
+#   url        -> la que usa este micro (IP privada de ec2-mq)
+#   public-url -> la que abre el navegador desde el botón del front (IP pública)
+rabbit:
+  management:
+    url: ${RABBIT_MANAGEMENT_URL:http://localhost:15672}
+    username: ${spring.rabbitmq.username}
+    password: ${spring.rabbitmq.password}
+    public-url: ${RABBIT_MANAGEMENT_PUBLIC_URL:http://localhost:15672}
+  # Prefijos de la topología del sistema: no se pueden crear ni eliminar desde
+  # el administrador (amq.* además está reservado por RabbitMQ).
+  protected-prefixes: cmd.,q.cmd.,amq.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -66,6 +66,9 @@ public class SecurityConfig {
                         // vouchers: el huésped baja los suyos, el personal cualquiera (lo valida notify)
                         .requestMatchers(HttpMethod.GET, "/api/vouchers/**").authenticated()
 
+                        // administrador de RabbitMQ: solo Admin
+                        .requestMatchers("/api/admin/**").hasRole("Admin")
+
                         // audit: solo lectura Auditor (o Admin)
                         .requestMatchers("/api/audit/**").hasAnyRole("Auditor", "Admin")
 
