@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import cl.tigrechiquito.ms_andesstay_rabbit_admin.client.ManagementApiModels.BindingJson;
 import cl.tigrechiquito.ms_andesstay_rabbit_admin.client.ManagementApiModels.QueueJson;
 import cl.tigrechiquito.ms_andesstay_rabbit_admin.client.ManagementClient;
 import cl.tigrechiquito.ms_andesstay_rabbit_admin.config.AdminProperties;
@@ -44,8 +45,9 @@ public class MonitoringService {
     }
 
     public List<QueueView> queues() {
+        List<BindingJson> bindings = client.bindings();
         return client.queues().stream()
-                .map(this::toView)
+                .map(q -> toView(q, bindings))
                 .sorted(Comparator.comparing(QueueView::name))
                 .toList();
     }
@@ -68,7 +70,7 @@ public class MonitoringService {
                 .toList();
     }
 
-    private QueueView toView(QueueJson q) {
+    private QueueView toView(QueueJson q, List<BindingJson> bindings) {
         Map<String, Object> args = q.arguments() != null ? q.arguments() : Map.of();
         return new QueueView(
                 q.name(),
@@ -80,11 +82,30 @@ public class MonitoringService {
                 orZero(q.messagesUnacknowledged()),
                 q.consumers() != null ? q.consumers() : 0,
                 q.name().endsWith(RabbitAdminService.DLQ_SUFFIX),
-                asString(args.get("x-dead-letter-routing-key")),
+                deadLetterQueue(args, bindings),
                 asLong(args.get("x-message-ttl")),
                 asLong(args.get("x-max-length")),
                 asString(args.get("x-overflow")),
                 properties.isProtected(q.name()));
+    }
+
+    /**
+     * La cola real que recibe los mensajes fallidos: la que está unida al DLX con
+     * la routing key de dead-letter (ej. notification.dlq -> q.cmd.notification.dlq).
+     * Si no se encuentra el binding, se muestra la routing key.
+     */
+    private static String deadLetterQueue(Map<String, Object> args, List<BindingJson> bindings) {
+        String dlx = asString(args.get("x-dead-letter-exchange"));
+        String routingKey = asString(args.get("x-dead-letter-routing-key"));
+        if (dlx == null) {
+            return null;
+        }
+        return bindings.stream()
+                .filter(b -> dlx.equals(b.source()) && "queue".equals(b.destinationType()))
+                .filter(b -> routingKey == null || routingKey.equals(b.routingKey()))
+                .map(BindingJson::destination)
+                .findFirst()
+                .orElse(routingKey);
     }
 
     private static long orZero(Long value) {
