@@ -27,6 +27,17 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                                      @Param("staff") boolean staff,
                                      Pageable pageable);
 
+    /** Avisos no leídos con la misma visibilidad que {@link #findVisibleTo}. */
+    @Query("""
+            select count(n) from Notification n
+            where n.read = false
+              and ((n.audience = cl.tigrechiquito.ms_andesstay_notify.domain.Audience.GUEST
+                    and n.recipientId = :userId)
+                or (:staff = true
+                    and n.audience = cl.tigrechiquito.ms_andesstay_notify.domain.Audience.STAFF))
+            """)
+    long countUnreadVisibleTo(@Param("userId") String userId, @Param("staff") boolean staff);
+
     @Modifying
     @Query("""
             update Notification n set n.read = true

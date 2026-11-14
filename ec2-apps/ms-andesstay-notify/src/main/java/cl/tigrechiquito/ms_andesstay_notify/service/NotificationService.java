@@ -107,6 +107,11 @@ public class NotificationService {
         return repository.findVisibleTo(userId, staff, PageRequest.of(0, MAX_RESULTS));
     }
 
+    @Transactional(readOnly = true)
+    public long countUnread(String userId, boolean staff) {
+        return repository.countUnreadVisibleTo(userId, staff);
+    }
+
     @Transactional
     public Notification markRead(Long id, String userId, boolean staff) {
         Notification n = repository.findById(id)

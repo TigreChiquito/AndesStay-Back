@@ -43,6 +43,15 @@ public class NotificationController {
                 .toList();
     }
 
+    /** GET /api/notifications/unread-count — cuántos avisos visibles faltan por leer. */
+    @GetMapping("/unread-count")
+    public Map<String, Long> unreadCount(
+            @RequestHeader(value = HEADER_USER_ID, required = false) String userId,
+            @RequestHeader(value = HEADER_USER_ROLES, required = false) String roles) {
+
+        return Map.of("count", service.countUnread(userId, isStaff(roles)));
+    }
+
     /** PATCH /api/notifications/{id}/read — marca un aviso como leído (404 si no es visible). */
     @PatchMapping("/{id}/read")
     public NotificationResponse markRead(
