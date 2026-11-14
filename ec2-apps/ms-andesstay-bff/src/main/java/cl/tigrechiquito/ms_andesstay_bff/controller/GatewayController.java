@@ -1,6 +1,8 @@
 package cl.tigrechiquito.ms_andesstay_bff.controller;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpHeaders;
@@ -8,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -53,7 +56,12 @@ public class GatewayController {
     private final GatewayProperties properties;
 
     public GatewayController(GatewayProperties properties) {
-        this.restClient = RestClient.create();
+        // Timeouts acotados: si un micro no responde, el front recibe 502 en
+        // segundos en vez de esperar al corte del API Gateway.
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build());
+        requestFactory.setReadTimeout(Duration.ofSeconds(5));
+        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
         this.properties = properties;
     }
 

@@ -38,6 +38,13 @@ spring:
         # y el API Gateway corta a los 30s con 503. Se acota para no colgar el request.
         max.block.ms: 5000
 
+  # Timeouts del RestClient autoconfigurado (lo usa CatalogClient): si catalog
+  # no responde, se corta rapido con 503 en vez de colgar el request.
+  http:
+    clients:
+      connect-timeout: 3s
+      read-timeout: 5s
+
 server:
   port: 8081
 
