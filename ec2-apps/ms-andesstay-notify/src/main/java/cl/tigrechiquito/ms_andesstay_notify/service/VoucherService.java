@@ -50,10 +50,16 @@ public class VoucherService {
         long nights = (p.checkInDate() != null && p.checkOutDate() != null)
                 ? ChronoUnit.DAYS.between(p.checkInDate(), p.checkOutDate())
                 : 0;
-        BigDecimal pricePerNight = unit.map(UnitInfo::pricePerNight).orElse(null);
-        BigDecimal total = (pricePerNight != null && nights > 0)
-                ? pricePerNight.multiply(BigDecimal.valueOf(nights))
-                : null;
+        // El precio viaja en el comando (el que vio el huésped al reservar). Las
+        // reservas antiguas no lo traen: para esas se usa la tarifa actual de catalog.
+        BigDecimal pricePerNight = p.pricePerNight() != null
+                ? p.pricePerNight()
+                : unit.map(UnitInfo::pricePerNight).orElse(null);
+        BigDecimal total = p.total() != null
+                ? p.total()
+                : (pricePerNight != null && nights > 0)
+                        ? pricePerNight.multiply(BigDecimal.valueOf(nights))
+                        : null;
         String code = "AS-%06d".formatted(p.reservationId());
 
         byte[] pdf = pdfGenerator.generate(new VoucherData(

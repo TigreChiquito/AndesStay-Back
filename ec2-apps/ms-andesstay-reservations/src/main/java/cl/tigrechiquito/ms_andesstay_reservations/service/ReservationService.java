@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogClient;
+import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogUnit;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationAccessDeniedException;
@@ -58,7 +59,8 @@ public class ReservationService {
         if (req.checkInDate().isBefore(LocalDate.now(ZONE))) {
             throw new IllegalArgumentException("La fecha de llegada no puede ser anterior a hoy.");
         }
-        if (!catalogClient.getUnit(req.unitId()).active()) {
+        CatalogUnit unit = catalogClient.getUnit(req.unitId());
+        if (!unit.active()) {
             throw new IllegalArgumentException(
                     "La unidad " + req.unitId() + " está desactivada y no acepta reservas.");
         }
@@ -69,6 +71,7 @@ public class ReservationService {
                 req.unitId(),
                 req.checkInDate(),
                 req.checkOutDate());
+        reservation.applyPrice(unit.pricePerNight());
 
         Reservation saved = repository.save(reservation);
 

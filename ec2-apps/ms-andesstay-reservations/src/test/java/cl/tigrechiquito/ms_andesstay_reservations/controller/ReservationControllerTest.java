@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -74,7 +75,7 @@ class ReservationControllerTest {
     }
 
     private void saveReturnsWithId() {
-        when(catalogClient.getUnit(any())).thenReturn(new CatalogUnit(1L, true));
+        when(catalogClient.getUnit(any())).thenReturn(new CatalogUnit(1L, true, new BigDecimal("50000")));
         when(repository.save(any(Reservation.class))).thenAnswer(inv -> {
             Reservation r = inv.getArgument(0);
             ReflectionTestUtils.setField(r, "id", 99L);
@@ -278,7 +279,7 @@ class ReservationControllerTest {
 
     @Test
     void crearSobreUnidadInactivaResponde400() throws Exception {
-        when(catalogClient.getUnit(5L)).thenReturn(new CatalogUnit(5L, false));
+        when(catalogClient.getUnit(5L)).thenReturn(new CatalogUnit(5L, false, new BigDecimal("50000")));
 
         mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -356,5 +357,28 @@ class ReservationControllerTest {
                 .andExpect(status().isOk());
 
         assertThat(SpecProbe.of(lastSearchSpec()).paths).isEmpty();
+    }
+
+    // ---------- P2-3: precio guardado en la reserva ----------
+
+    @Test
+    void crearGuardaLaTarifaYElTotal() throws Exception {
+        saveReturnsWithId(); // catalog: 50000 por noche; createBody: 2 noches
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody("A")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.pricePerNight").value(50000))
+                .andExpect(jsonPath("$.total").value(100000));
+    }
+
+    @Test
+    void unaReservaAntiguaSinTarifaTienePrecioYTotalNulos() throws Exception {
+        when(repository.findById(1L)).thenReturn(Optional.of(reservation(1, "A")));
+
+        mvc.perform(get("/api/reservations/1").header("X-User-Id", "A").header("X-User-Roles", "Cliente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pricePerNight").isEmpty())
+                .andExpect(jsonPath("$.total").isEmpty());
     }
 }

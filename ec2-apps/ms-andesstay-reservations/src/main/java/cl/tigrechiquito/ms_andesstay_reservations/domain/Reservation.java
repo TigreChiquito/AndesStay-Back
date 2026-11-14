@@ -1,7 +1,9 @@
 package cl.tigrechiquito.ms_andesstay_reservations.domain;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -49,6 +51,18 @@ public class Reservation {
     @Column(nullable = false, length = 20)
     private ReservationStatus status;
 
+    /**
+     * Tarifa por noche (CLP) al momento de reservar, copiada de catalog. Así el
+     * voucher respeta lo que vio el huésped aunque después cambie la tarifa.
+     * Nula en reservas creadas antes de guardar el precio.
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal pricePerNight;
+
+    /** pricePerNight × noches. Nulo si no hay pricePerNight. */
+    @Column(precision = 14, scale = 2)
+    private BigDecimal total;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -74,6 +88,14 @@ public class Reservation {
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
         this.status = ReservationStatus.CREADA;
+    }
+
+    /** Fija la tarifa por noche y calcula el total según las noches de la estadía. */
+    public void applyPrice(BigDecimal pricePerNight) {
+        this.pricePerNight = pricePerNight;
+        this.total = pricePerNight == null
+                ? null
+                : pricePerNight.multiply(BigDecimal.valueOf(ChronoUnit.DAYS.between(checkInDate, checkOutDate)));
     }
 
     @PrePersist
@@ -138,6 +160,14 @@ public class Reservation {
 
     public ReservationStatus getStatus() {
         return status;
+    }
+
+    public BigDecimal getPricePerNight() {
+        return pricePerNight;
+    }
+
+    public BigDecimal getTotal() {
+        return total;
     }
 
     public Instant getCreatedAt() {

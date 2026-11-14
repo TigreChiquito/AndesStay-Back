@@ -1,5 +1,6 @@
 package cl.tigrechiquito.ms_andesstay_reservations.messaging.rabbit;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
@@ -16,7 +17,9 @@ public record ReservationCommand(
         Long unitId,
         LocalDate checkInDate,
         LocalDate checkOutDate,
-        String status
+        String status,
+        BigDecimal pricePerNight,
+        BigDecimal total
 ) {
 
     public static ReservationCommand from(Reservation r) {
@@ -27,6 +30,8 @@ public record ReservationCommand(
                 r.getUnitId(),
                 r.getCheckInDate(),
                 r.getCheckOutDate(),
-                r.getStatus().name());
+                r.getStatus().name(),
+                r.getPricePerNight(),
+                r.getTotal());
     }
 }

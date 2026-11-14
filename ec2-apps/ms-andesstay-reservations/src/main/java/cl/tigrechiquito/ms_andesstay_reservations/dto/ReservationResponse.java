@@ -1,5 +1,6 @@
 package cl.tigrechiquito.ms_andesstay_reservations.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -23,7 +24,9 @@ public record ReservationResponse(
         Instant updatedAt,
         List<ReservationStatus> allowedTransitions,  // estados a los que puede pasar
         ReservationStatus nextStatus,                // siguiente paso del flujo; null si es terminal
-        boolean cancellable                          // allowedTransitions contiene CANCELADA
+        boolean cancellable,                         // allowedTransitions contiene CANCELADA
+        BigDecimal pricePerNight,                    // tarifa al reservar; null en reservas antiguas
+        BigDecimal total                             // pricePerNight × noches; null si no hay tarifa
 ) {
 
     public static ReservationResponse from(Reservation r) {
@@ -39,7 +42,9 @@ public record ReservationResponse(
                 r.getUpdatedAt(),
                 List.copyOf(r.getStatus().allowedTransitions()),
                 r.getStatus().nextStatus(),
-                r.getStatus().canTransitionTo(ReservationStatus.CANCELADA)
+                r.getStatus().canTransitionTo(ReservationStatus.CANCELADA),
+                r.getPricePerNight(),
+                r.getTotal()
         );
     }
 }
