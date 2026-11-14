@@ -3,6 +3,7 @@ package cl.tigrechiquito.ms_andesstay_reservations.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,6 +50,21 @@ class ReservationControllerTest {
         ReflectionTestUtils.setField(r, "createdAt", Instant.parse("2029-12-01T00:00:00Z"));
         ReflectionTestUtils.setField(r, "updatedAt", Instant.parse("2029-12-01T00:00:00Z"));
         return r;
+    }
+
+    private void saveReturnsWithId() {
+        when(repository.save(any(Reservation.class))).thenAnswer(inv -> {
+            Reservation r = inv.getArgument(0);
+            ReflectionTestUtils.setField(r, "id", 99L);
+            return r;
+        });
+    }
+
+    static String createBody(String guestId) {
+        LocalDate in = LocalDate.now().plusDays(10);
+        return """
+                {"guestId":"%s","guestName":"Ana","unitId":1,"checkInDate":"%s","checkOutDate":"%s"}
+                """.formatted(guestId, in, in.plusDays(2));
     }
 
     // ---------- P0-1: visibilidad de reservas ----------
@@ -124,6 +141,35 @@ class ReservationControllerTest {
         when(repository.findByGuestIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
 
         mvc.perform(get("/api/reservations"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- P0-2: guestId de la reserva ----------
+
+    @Test
+    void clienteNoPuedeReservarANombreDeOtro() throws Exception {
+        saveReturnsWithId();
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody("otro")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.guestId").value("A"));
+    }
+
+    @Test
+    void recepcionistaReservaANombreDelHuesped() throws Exception {
+        saveReturnsWithId();
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "recep").header("X-User-Roles", "Recepcionista")
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody("huesped-1")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.guestId").value("huesped-1"));
+    }
+
+    @Test
+    void crearSinUsuarioResponde401() throws Exception {
+        mvc.perform(post("/api/reservations")
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody("otro")))
                 .andExpect(status().isUnauthorized());
     }
 }

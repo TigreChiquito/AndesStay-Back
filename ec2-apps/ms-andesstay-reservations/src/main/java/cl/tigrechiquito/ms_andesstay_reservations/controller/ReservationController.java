@@ -37,12 +37,22 @@ public class ReservationController {
         this.service = service;
     }
 
-    /** POST /api/reservations — crea una reserva (nace en CREADA). */
+    /**
+     * POST /api/reservations — crea una reserva (nace en CREADA). El personal
+     * puede indicar el guestId del huésped; para el resto se usa X-User-Id y el
+     * guestId del body se ignora.
+     */
     @PostMapping
     public ResponseEntity<ReservationResponse> create(
-            @Valid @RequestBody CreateReservationRequest request) {
+            @Valid @RequestBody CreateReservationRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
 
-        Reservation created = service.create(request);
+        String guestId = isStaff(roles) ? request.guestId() : requireUser(userId);
+        if (guestId == null || guestId.isBlank()) {
+            throw new IllegalArgumentException("Indica el huésped de la reserva (guestId).");
+        }
+        Reservation created = service.create(request, guestId);
         URI location = URI.create("/api/reservations/" + created.getId());
         return ResponseEntity.created(location).body(ReservationResponse.from(created));
     }

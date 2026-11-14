@@ -2,19 +2,16 @@ package cl.tigrechiquito.ms_andesstay_reservations.dto;
 
 import java.time.LocalDate;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 /**
  * Payload de creación de una reserva.
  *
- * Nota: por ahora {@code guestId} llega en el body. Cuando conectemos la
- * seguridad, este dato saldrá del token de Azure AD (sub/oid) inyectado por el
- * BFF, y se podrá quitar de aquí.
+ * {@code guestId} solo lo respeta el personal (Recepcionista/Admin), que lo
+ * necesita para registrar a un huésped; para el resto se toma de X-User-Id.
  */
 public record CreateReservationRequest(
 
-        @NotBlank(message = "guestId es obligatorio")
         String guestId,
 
         String guestName,

@@ -42,15 +42,16 @@ public class ReservationService {
         this.catalogClient = catalogClient;
     }
 
+    /** Crea la reserva a nombre de {@code guestId} (lo decide el controller según quién llama). */
     @Transactional
-    public Reservation create(CreateReservationRequest req) {
+    public Reservation create(CreateReservationRequest req, String guestId) {
         if (!req.checkOutDate().isAfter(req.checkInDate())) {
             throw new IllegalArgumentException(
                     "checkOutDate debe ser posterior a checkInDate");
         }
 
         Reservation reservation = new Reservation(
-                req.guestId(),
+                guestId,
                 req.guestName(),
                 req.unitId(),
                 req.checkInDate(),
