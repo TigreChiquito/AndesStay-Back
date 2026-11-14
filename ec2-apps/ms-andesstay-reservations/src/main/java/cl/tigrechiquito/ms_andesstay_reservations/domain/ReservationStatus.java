@@ -50,6 +50,14 @@ public enum ReservationStatus {
         return target != null && allowedTransitions().contains(target);
     }
 
+    /** Siguiente estado del flujo feliz (sin contar CANCELADA); null si es terminal. */
+    public ReservationStatus nextStatus() {
+        return allowedTransitions().stream()
+                .filter(target -> target != CANCELADA)
+                .findFirst()
+                .orElse(null);
+    }
+
     /** ¿Es un estado final (sin salidas)? */
     public boolean isTerminal() {
         return allowedTransitions().isEmpty();

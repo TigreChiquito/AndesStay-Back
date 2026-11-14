@@ -230,4 +230,33 @@ class ReservationControllerTest {
                         .content(createBody("A", 5L, LocalDate.now().plusDays(3))))
                 .andExpect(status().isBadRequest());
     }
+
+    // ---------- P2-1: campos de la máquina de estados en el JSON ----------
+
+    @Test
+    void elJsonIncluyeTransicionesSiguientePasoYCancelable() throws Exception {
+        Reservation r = reservation(1, "A");
+        ReflectionTestUtils.setField(r, "status", ReservationStatus.CHECKIN_PENDIENTE);
+        when(repository.findById(1L)).thenReturn(Optional.of(r));
+
+        mvc.perform(get("/api/reservations/1").header("X-User-Id", "A").header("X-User-Roles", "Cliente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowedTransitions[0]").value("EN_ESTADIA"))
+                .andExpect(jsonPath("$.allowedTransitions[1]").value("CANCELADA"))
+                .andExpect(jsonPath("$.nextStatus").value("EN_ESTADIA"))
+                .andExpect(jsonPath("$.cancellable").value(true));
+    }
+
+    @Test
+    void unaReservaTerminalTieneNextStatusNulo() throws Exception {
+        Reservation r = reservation(1, "A");
+        ReflectionTestUtils.setField(r, "status", ReservationStatus.CHECKOUT);
+        when(repository.findById(1L)).thenReturn(Optional.of(r));
+
+        mvc.perform(get("/api/reservations/1").header("X-User-Id", "A").header("X-User-Roles", "Cliente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowedTransitions").isEmpty())
+                .andExpect(jsonPath("$.nextStatus").isEmpty())
+                .andExpect(jsonPath("$.cancellable").value(false));
+    }
 }
