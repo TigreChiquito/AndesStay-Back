@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationAccessDeniedException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.UnidentifiedUserException;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.CreateReservationRequest;
@@ -26,6 +27,8 @@ import cl.tigrechiquito.ms_andesstay_reservations.dto.UpdateStatusRequest;
 import cl.tigrechiquito.ms_andesstay_reservations.service.ReservationService;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 @RestController
 @RequestMapping("/api/reservations")
@@ -66,6 +69,22 @@ public class ReservationController {
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         return service.findByGuest(requireUser(userId)).stream()
+                .map(ReservationResponse::from)
+                .toList();
+    }
+
+    /** GET /api/reservations/recent?limit=5 — últimas reservas creadas; solo el personal. */
+    @GetMapping("/recent")
+    public List<ReservationResponse> recent(
+            @RequestParam(defaultValue = "5")
+            @Min(value = 1, message = "limit debe estar entre 1 y 50")
+            @Max(value = 50, message = "limit debe estar entre 1 y 50") int limit,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+
+        if (!isStaff(roles)) {
+            throw new ReservationAccessDeniedException("Solo el personal puede ver las últimas reservas.");
+        }
+        return service.recent(limit).stream()
                 .map(ReservationResponse::from)
                 .toList();
     }

@@ -8,6 +8,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -195,6 +196,13 @@ public class ReservationService {
             filters.add((r, q, cb) -> cb.lessThanOrEqualTo(r.get("checkOutDate"), checkOutTo));
         }
         return repository.findAll(Specification.allOf(filters), Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    /** Las {@code limit} reservas creadas más recientemente (dashboard del personal). */
+    @Transactional(readOnly = true)
+    public List<Reservation> recent(int limit) {
+        return repository.findAll(PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
     }
 
     /** El cupo se devuelve al cancelar una reserva ya confirmada o al hacer checkout. */

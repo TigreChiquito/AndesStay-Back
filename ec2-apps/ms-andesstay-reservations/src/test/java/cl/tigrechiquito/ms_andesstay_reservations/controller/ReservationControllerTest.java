@@ -28,6 +28,8 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
@@ -380,5 +382,50 @@ class ReservationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pricePerNight").isEmpty())
                 .andExpect(jsonPath("$.total").isEmpty());
+    }
+
+    // ---------- P2-4: últimas reservas ----------
+
+    @Test
+    void recentDevuelveLasUltimasParaElPersonal() throws Exception {
+        when(repository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(reservation(3, "A"), reservation(2, "B"))));
+
+        mvc.perform(get("/api/reservations/recent").param("limit", "2").header("X-User-Roles", "Recepcionista"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(3));
+
+        ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findAll(page.capture());
+        assertThat(page.getValue().getPageSize()).isEqualTo(2);
+        assertThat(page.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
+    }
+
+    @Test
+    void recentUsaCincoPorDefecto() throws Exception {
+        when(repository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+
+        mvc.perform(get("/api/reservations/recent").header("X-User-Roles", "Admin"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findAll(page.capture());
+        assertThat(page.getValue().getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    void recentConLimiteFueraDeRangoResponde400() throws Exception {
+        for (String limit : List.of("0", "51")) {
+            mvc.perform(get("/api/reservations/recent").param("limit", limit).header("X-User-Roles", "Admin"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value("limit debe estar entre 1 y 50"));
+        }
+    }
+
+    @Test
+    void recentNoEsParaElCliente() throws Exception {
+        mvc.perform(get("/api/reservations/recent").header("X-User-Id", "A").header("X-User-Roles", "Cliente"))
+                .andExpect(status().isForbidden());
     }
 }

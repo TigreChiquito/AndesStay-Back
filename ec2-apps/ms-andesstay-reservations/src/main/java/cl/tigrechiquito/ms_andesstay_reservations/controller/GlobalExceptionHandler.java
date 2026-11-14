@@ -3,6 +3,7 @@ package cl.tigrechiquito.ms_andesstay_reservations.controller;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -10,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogUnavailableException;
 import cl.tigrechiquito.ms_andesstay_reservations.client.UnitNotAvailableException;
@@ -83,6 +85,16 @@ public class GlobalExceptionHandler {
                 .forEach(fieldError -> errors.put(fieldError.getField(), fieldError.getDefaultMessage()));
         problem.setProperty("errors", errors);
         return problem;
+    }
+
+    /** Parámetros de la URL fuera de rango (ej. limit de /recent) -> 400. */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ProblemDetail handleParamValidation(HandlerMethodValidationException ex) {
+        String detail = ex.getAllErrors().stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .findFirst()
+                .orElse("Parámetros inválidos");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
