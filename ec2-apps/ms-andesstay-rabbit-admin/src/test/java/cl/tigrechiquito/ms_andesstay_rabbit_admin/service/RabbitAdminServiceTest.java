@@ -122,6 +122,28 @@ class RabbitAdminServiceTest {
     }
 
     @Test
+    void eliminarUnaColaConDlqEliminaTambienLaDlq() {
+        when(rabbitAdmin.getQueueInfo("q.demo")).thenReturn(new QueueInformation("q.demo", 0, 0));
+        when(rabbitAdmin.getQueueInfo("q.demo.dlq")).thenReturn(new QueueInformation("q.demo.dlq", 2, 0));
+
+        service.deleteQueue("q.demo");
+
+        verify(rabbitAdmin).deleteQueue(eq("q.demo"));
+        verify(rabbitAdmin).deleteQueue(eq("q.demo.dlq"));
+    }
+
+    @Test
+    void eliminarUnaColaSinDlqNoBorraOtraCosa() {
+        when(rabbitAdmin.getQueueInfo("q.demo")).thenReturn(new QueueInformation("q.demo", 0, 0));
+        when(rabbitAdmin.getQueueInfo("q.demo.dlq")).thenReturn(null);
+
+        service.deleteQueue("q.demo");
+
+        verify(rabbitAdmin).deleteQueue(eq("q.demo"));
+        verify(rabbitAdmin, never()).deleteQueue(eq("q.demo.dlq"));
+    }
+
+    @Test
     void noSeTocanLosBindingsDeColasDelSistema() {
         assertThatThrownBy(() -> service.createBinding(new BindingRequest("cmd.topic", "q.cmd.voucher", "x")))
                 .isInstanceOf(ResourceConflictException.class);

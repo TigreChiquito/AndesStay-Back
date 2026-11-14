@@ -91,6 +91,7 @@ public class RabbitAdminService {
         return queueInfo(name);
     }
 
+    /** Elimina la cola y, si se creó con withDlq, también su "&lt;name&gt;.dlq". */
     public void deleteQueue(String name) {
         requireNotProtected(name, "la cola");
         if (!queueExists(name)) {
@@ -98,6 +99,12 @@ public class RabbitAdminService {
         }
         rabbitAdmin.deleteQueue(name);
         log.info("ADMIN cola eliminada: {}", name);
+
+        String dlqName = name + DLQ_SUFFIX;
+        if (queueExists(dlqName)) {
+            rabbitAdmin.deleteQueue(dlqName);
+            log.info("ADMIN DLQ eliminada junto a su cola: {}", dlqName);
+        }
     }
 
     /** Mensajes pendientes y consumidores de una cola (por AMQP). */
