@@ -1,6 +1,7 @@
 package cl.tigrechiquito.ms_andesstay_reservations.service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -29,6 +30,7 @@ import cl.tigrechiquito.ms_andesstay_reservations.repository.ReservationReposito
 public class ReservationService {
 
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
+    private static final ZoneId ZONE = ZoneId.of("America/Santiago");
 
     private final ReservationRepository repository;
     private final ApplicationEventPublisher events;
@@ -48,6 +50,14 @@ public class ReservationService {
         if (!req.checkOutDate().isAfter(req.checkInDate())) {
             throw new IllegalArgumentException(
                     "checkOutDate debe ser posterior a checkInDate");
+        }
+        // "Hoy" según Chile, no según la JVM (el contenedor corre en UTC).
+        if (req.checkInDate().isBefore(LocalDate.now(ZONE))) {
+            throw new IllegalArgumentException("La fecha de llegada no puede ser anterior a hoy.");
+        }
+        if (!catalogClient.getUnit(req.unitId()).active()) {
+            throw new IllegalArgumentException(
+                    "La unidad " + req.unitId() + " está desactivada y no acepta reservas.");
         }
 
         Reservation reservation = new Reservation(

@@ -24,6 +24,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogClient;
+import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogUnit;
+import cl.tigrechiquito.ms_andesstay_reservations.client.UnitNotFoundInCatalogException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.repository.ReservationRepository;
@@ -56,6 +58,7 @@ class ReservationControllerTest {
     }
 
     private void saveReturnsWithId() {
+        when(catalogClient.getUnit(any())).thenReturn(new CatalogUnit(1L, true));
         when(repository.save(any(Reservation.class))).thenAnswer(inv -> {
             Reservation r = inv.getArgument(0);
             ReflectionTestUtils.setField(r, "id", 99L);
@@ -64,10 +67,13 @@ class ReservationControllerTest {
     }
 
     static String createBody(String guestId) {
-        LocalDate in = LocalDate.now().plusDays(10);
+        return createBody(guestId, 1L, LocalDate.now().plusDays(10));
+    }
+
+    static String createBody(String guestId, long unitId, LocalDate in) {
         return """
-                {"guestId":"%s","guestName":"Ana","unitId":1,"checkInDate":"%s","checkOutDate":"%s"}
-                """.formatted(guestId, in, in.plusDays(2));
+                {"guestId":"%s","guestName":"Ana","unitId":%d,"checkInDate":"%s","checkOutDate":"%s"}
+                """.formatted(guestId, unitId, in, in.plusDays(2));
     }
 
     // ---------- P0-1: visibilidad de reservas ----------
@@ -190,5 +196,38 @@ class ReservationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CHECKOUT\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("La reserva cambió mientras la editabas. Recarga e intenta de nuevo."));
+    }
+
+    // ---------- P1-3: validaciones al crear ----------
+
+    @Test
+    void crearConLlegadaEnElPasadoResponde400() throws Exception {
+        saveReturnsWithId();
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody("A", 1L, LocalDate.now().minusDays(3))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("La fecha de llegada no puede ser anterior a hoy."));
+    }
+
+    @Test
+    void crearSobreUnidadInexistenteResponde400() throws Exception {
+        when(catalogClient.getUnit(9999L)).thenThrow(new UnitNotFoundInCatalogException(9999L));
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody("A", 9999L, LocalDate.now().plusDays(3))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void crearSobreUnidadInactivaResponde400() throws Exception {
+        when(catalogClient.getUnit(5L)).thenReturn(new CatalogUnit(5L, false));
+
+        mvc.perform(post("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody("A", 5L, LocalDate.now().plusDays(3))))
+                .andExpect(status().isBadRequest());
     }
 }

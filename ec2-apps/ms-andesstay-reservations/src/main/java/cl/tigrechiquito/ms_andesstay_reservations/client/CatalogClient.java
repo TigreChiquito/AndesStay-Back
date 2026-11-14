@@ -26,6 +26,20 @@ public class CatalogClient {
         this.restClient = builder.baseUrl(baseUrl).build();
     }
 
+    /** Consulta la unidad. Lanza UnitNotFoundInCatalogException (400) si no existe. */
+    public CatalogUnit getUnit(Long unitId) {
+        try {
+            return restClient.get()
+                    .uri("/api/units/{id}", unitId)
+                    .retrieve()
+                    .body(CatalogUnit.class);
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new UnitNotFoundInCatalogException(unitId);
+        } catch (ResourceAccessException ex) {
+            throw new CatalogUnavailableException(unitId, ex);
+        }
+    }
+
     /** Descuenta un cupo. Lanza UnitNotAvailableException si catalog responde 409. */
     public void reserveSlot(Long unitId) {
         call(unitId, "reserve");
