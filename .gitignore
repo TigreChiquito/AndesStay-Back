@@ -12,5 +12,9 @@ target/
 *.iml
 .vscode/
  
+# Notas locales de contexto y mejoras (raiz)
+/CONTEXTO-*.md
+/MEJORAS-*.md
+ 
 # Sistema
 .DS_Store
