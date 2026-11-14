@@ -29,4 +29,3 @@ management:
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE   # además, los valores de los parámetros (?)

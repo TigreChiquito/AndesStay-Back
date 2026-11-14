@@ -51,7 +51,6 @@ management:
 logging:
   level:
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE   # ademas, los valores de los parametros (?)
 
 # URL del microservicio catalog (para coordinar disponibilidad de cupos)
 catalog:
