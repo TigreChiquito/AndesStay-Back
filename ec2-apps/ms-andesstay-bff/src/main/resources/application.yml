@@ -35,4 +35,4 @@ management:
 
 # Origenes del front permitidos (CORS). Coma-separado para varios.
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
