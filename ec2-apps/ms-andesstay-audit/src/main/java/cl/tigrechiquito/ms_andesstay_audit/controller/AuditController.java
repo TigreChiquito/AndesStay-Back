@@ -30,10 +30,16 @@ public class AuditController {
         return service.timelineOf(reservationId);
     }
 
-    /** GET /api/audit/events?limit=50 — últimos eventos registrados. */
+    static final int MAX_LIMIT = 500;
+
+    /** GET /api/audit/events?limit=50 — últimos eventos registrados (limit entre 1 y 500). */
     @GetMapping("/events")
     public List<AuditEventResponse> recent(
             @RequestParam(required = false, defaultValue = "50") int limit) {
+        // Validación a mano: audit no incluye spring-boot-starter-validation.
+        if (limit < 1 || limit > MAX_LIMIT) {
+            throw new IllegalArgumentException("El límite debe estar entre 1 y " + MAX_LIMIT + ".");
+        }
         return service.recent(limit);
     }
 }
