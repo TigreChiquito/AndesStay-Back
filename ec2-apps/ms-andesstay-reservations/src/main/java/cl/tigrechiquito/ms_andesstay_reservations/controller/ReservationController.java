@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.UnidentifiedUserException;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.CreateReservationRequest;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.ReservationResponse;
 import cl.tigrechiquito.ms_andesstay_reservations.dto.UpdateStatusRequest;
@@ -46,10 +47,27 @@ public class ReservationController {
         return ResponseEntity.created(location).body(ReservationResponse.from(created));
     }
 
-    /** GET /api/reservations/{id} */
+    /**
+     * GET /api/reservations/mine — las reservas del usuario autenticado (X-User-Id),
+     * de la más reciente a la más antigua.
+     */
+    @GetMapping("/mine")
+    public List<ReservationResponse> mine(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+
+        return service.findByGuest(requireUser(userId)).stream()
+                .map(ReservationResponse::from)
+                .toList();
+    }
+
+    /** GET /api/reservations/{id} — el personal ve cualquiera; el huésped solo las suyas (si no, 404). */
     @GetMapping("/{id}")
-    public ReservationResponse getById(@PathVariable Long id) {
-        return ReservationResponse.from(service.getById(id));
+    public ReservationResponse getById(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+
+        return ReservationResponse.from(service.getVisibleById(id, userId, canReadAll(roles)));
     }
 
     /** PUT /api/reservations/{id}/status — cambia el estado según la máquina. */
@@ -75,28 +93,53 @@ public class ReservationController {
         return ReservationResponse.from(service.cancel(id, userId, isStaff(roles)));
     }
 
-    /** GET /api/reservations?status=...&from=...&to=... — todos los filtros opcionales. */
+    /**
+     * GET /api/reservations?status=...&from=...&to=... — todos los filtros opcionales.
+     * El personal (y Auditor) ve todas; el resto, solo las suyas.
+     */
     @GetMapping
     public List<ReservationResponse> search(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+
+        String guestFilter = canReadAll(roles) ? null : requireUser(userId);
 
         ReservationStatus parsedStatus = (status == null || status.isBlank())
                 ? null
                 : ReservationStatus.fromJson(status); // mismo parseo tolerante que el body
 
-        return service.search(parsedStatus, from, to).stream()
+        return service.search(parsedStatus, from, to, guestFilter).stream()
                 .map(ReservationResponse::from)
                 .toList();
     }
 
+    /** Personal con permisos de escritura: Recepcionista y Admin. */
     private static boolean isStaff(String roles) {
+        return hasAnyRole(roles, "Recepcionista", "Admin");
+    }
+
+    /** Para lecturas también cuenta el Auditor. */
+    private static boolean canReadAll(String roles) {
+        return hasAnyRole(roles, "Recepcionista", "Admin", "Auditor");
+    }
+
+    private static boolean hasAnyRole(String roles, String... wanted) {
         if (roles == null) {
             return false;
         }
+        List<String> wantedRoles = List.of(wanted);
         return Arrays.stream(roles.split(","))
                 .map(String::trim)
-                .anyMatch(role -> role.equals("Recepcionista") || role.equals("Admin"));
+                .anyMatch(wantedRoles::contains);
+    }
+
+    private static String requireUser(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new UnidentifiedUserException();
+        }
+        return userId;
     }
 }

@@ -15,6 +15,7 @@ import cl.tigrechiquito.ms_andesstay_reservations.client.UnitNotAvailableExcepti
 import cl.tigrechiquito.ms_andesstay_reservations.domain.InvalidReservationStatusTransitionException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationAccessDeniedException;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationNotFoundException;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.UnidentifiedUserException;
 
 /**
  * Traduce las excepciones del dominio/validacion/integracion a respuestas HTTP
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ReservationNotFoundException.class)
     public ProblemDetail handleNotFound(ReservationNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /** Falta X-User-Id: no sabemos quién llama -> 401 Unauthorized. */
+    @ExceptionHandler(UnidentifiedUserException.class)
+    public ProblemDetail handleUnidentified(UnidentifiedUserException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     /** Un huésped intenta operar sobre una reserva ajena -> 403 Forbidden. */

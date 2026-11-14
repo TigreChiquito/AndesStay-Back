@@ -19,6 +19,8 @@ import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
  */
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
+    List<Reservation> findByGuestIdOrderByCreatedAtDesc(String guestId);
+
     List<Reservation> findByStatus(ReservationStatus status);
 
     List<Reservation> findByCheckInDateBetween(LocalDate from, LocalDate to);

@@ -84,6 +84,25 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationNotFoundException(id));
     }
 
+    /**
+     * Lectura de una reserva respetando la visibilidad: quien no puede ver todas
+     * solo ve las suyas. Una ajena responde 404 (no 403) para no revelar que existe.
+     */
+    @Transactional(readOnly = true)
+    public Reservation getVisibleById(Long id, String userId, boolean readAll) {
+        Reservation reservation = getById(id);
+        if (!readAll && (userId == null || !userId.equals(reservation.getGuestId()))) {
+            throw new ReservationNotFoundException(id);
+        }
+        return reservation;
+    }
+
+    /** Reservas del huésped, de la más reciente a la más antigua. */
+    @Transactional(readOnly = true)
+    public List<Reservation> findByGuest(String guestId) {
+        return repository.findByGuestIdOrderByCreatedAtDesc(guestId);
+    }
+
     @Transactional
     public Reservation changeStatus(Long id, ReservationStatus target) {
         Reservation reservation = getById(id);
@@ -125,9 +144,20 @@ public class ReservationService {
         }
     }
 
+    /**
+     * Búsqueda con filtros opcionales. Si {@code guestId} no es nulo, solo
+     * devuelve reservas de ese huésped (lo usa el controller para quien no es personal).
+     */
     @Transactional(readOnly = true)
-    public List<Reservation> search(ReservationStatus status, LocalDate from, LocalDate to) {
+    public List<Reservation> search(ReservationStatus status, LocalDate from, LocalDate to, String guestId) {
         boolean hasRange = (from != null && to != null);
+
+        if (guestId != null) {
+            return findByGuest(guestId).stream()
+                    .filter(r -> status == null || r.getStatus() == status)
+                    .filter(r -> !hasRange || (!r.getCheckInDate().isBefore(from) && !r.getCheckInDate().isAfter(to)))
+                    .toList();
+        }
 
         if (status != null && hasRange) {
             return repository.findByStatusAndCheckInDateBetween(status, from, to);
