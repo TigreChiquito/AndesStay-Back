@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,12 +18,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import cl.tigrechiquito.ms_andesstay_reservations.client.CatalogClient;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
+import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.repository.ReservationRepository;
 import cl.tigrechiquito.ms_andesstay_reservations.service.ReservationService;
 
@@ -171,5 +174,21 @@ class ReservationControllerTest {
         mvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON).content(createBody("otro")))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- P1-1: choque optimista ----------
+
+    @Test
+    void choqueDeVersionResponde409() throws Exception {
+        Reservation r = reservation(1, "A");
+        ReflectionTestUtils.setField(r, "status", ReservationStatus.EN_ESTADIA);
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(r));
+        when(repository.saveAndFlush(any(Reservation.class)))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class, 1L));
+
+        mvc.perform(put("/api/reservations/1/status")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CHECKOUT\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("La reserva cambió mientras la editabas. Recarga e intenta de nuevo."));
     }
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,6 +48,13 @@ public class GlobalExceptionHandler {
         problem.setProperty("from", ex.getFrom());
         problem.setProperty("to", ex.getTo());
         return problem;
+    }
+
+    /** Otra petición modificó la reserva a la vez (choque de @Version) -> 409 Conflict. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "La reserva cambió mientras la editabas. Recarga e intenta de nuevo.");
     }
 
     /** Sin cupos en catalog al confirmar -> 409 Conflict. */

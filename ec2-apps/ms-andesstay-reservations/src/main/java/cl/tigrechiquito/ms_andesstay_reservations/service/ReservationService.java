@@ -72,7 +72,7 @@ public class ReservationService {
      */
     @Transactional
     public Reservation cancel(Long id, String userId, boolean staff) {
-        Reservation reservation = getById(id);
+        Reservation reservation = getForUpdate(id);
         if (!staff && (userId == null || !userId.equals(reservation.getGuestId()))) {
             throw new ReservationAccessDeniedException(id);
         }
@@ -106,7 +106,7 @@ public class ReservationService {
 
     @Transactional
     public Reservation changeStatus(Long id, ReservationStatus target) {
-        Reservation reservation = getById(id);
+        Reservation reservation = getForUpdate(id);
         ReservationStatus current = reservation.getStatus();
 
         // 1. Validar la transicion ANTES de tocar catalog (no reservar cupo en vano).
@@ -123,11 +123,13 @@ public class ReservationService {
         // 2. Coordinar disponibilidad con catalog (sincrono).
         //    Confirmar descuenta un cupo; si no hay, catalog responde 409 y abortamos.
         boolean slotReserved = false;
+        boolean slotReleased = false;
         if (target == ReservationStatus.CONFIRMADA && current != ReservationStatus.CONFIRMADA) {
             catalogClient.reserveSlot(reservation.getUnitId());
             slotReserved = true;
         } else if (releasesSlot(current, target)) {
             catalogClient.releaseSlot(reservation.getUnitId());
+            slotReleased = true;
         }
 
         // 3. Aplicar y persistir. saveAndFlush fuerza el flush aqui para detectar
@@ -140,6 +142,9 @@ public class ReservationService {
         } catch (RuntimeException ex) {
             if (slotReserved) {
                 compensateReserve(reservation.getUnitId());
+            }
+            if (slotReleased) {
+                compensateRelease(reservation.getUnitId());
             }
             throw ex;
         }
@@ -184,7 +189,23 @@ public class ReservationService {
         return false;
     }
 
-    /** Best-effort: devuelve el cupo si el guardado local fallo tras reservarlo. */
+    /** Lee la reserva con bloqueo de fila; ver {@link ReservationRepository#findByIdForUpdate}. */
+    private Reservation getForUpdate(Long id) {
+        return repository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ReservationNotFoundException(id));
+    }
+
+    /** Best-effort: vuelve a tomar el cupo si el guardado local fallo tras liberarlo. */
+    private void compensateRelease(Long unitId) {
+        try {
+            catalogClient.reserveSlot(unitId);
+            log.warn("Compensacion: cupo vuelto a tomar en catalog (unidad {}) tras fallo local", unitId);
+        } catch (RuntimeException ex) {
+            log.error("No se pudo compensar la liberacion del cupo de la unidad {} en catalog", unitId, ex);
+        }
+    }
+
+        /** Best-effort: devuelve el cupo si el guardado local fallo tras reservarlo. */
     private void compensateReserve(Long unitId) {
         try {
             catalogClient.releaseSlot(unitId);
