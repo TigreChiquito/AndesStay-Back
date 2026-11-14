@@ -37,11 +37,11 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reservations_db
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
       SPRING_RABBITMQ_HOST: ${MQ_HOST}
       SPRING_RABBITMQ_PORT: ${MQ_PORT:-5672}
       SPRING_RABBITMQ_USERNAME: ${MQ_USER:-andesstay}
-      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
+      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD:?define MQ_PASSWORD en .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
       CATALOG_BASE_URL: http://catalog:8082
       ANDESSTAY_KAFKA_REPLICAS: 3   # ec2-kafka tiene 3 brokers y min.insync.replicas=2
@@ -56,7 +56,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
 
   notify:
     build: ./ms-andesstay-notify
@@ -69,11 +69,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notify_db
       CATALOG_BASE_URL: http://catalog:8082
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
       SPRING_RABBITMQ_HOST: ${MQ_HOST}
       SPRING_RABBITMQ_PORT: ${MQ_PORT:-5672}
       SPRING_RABBITMQ_USERNAME: ${MQ_USER:-andesstay}
-      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
+      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD:?define MQ_PASSWORD en .env}
 
   report:
     build: ./ms-andesstay-report
@@ -85,7 +85,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/report_db
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
       ANDESSTAY_KAFKA_REPLICAS: 3
 
@@ -99,7 +99,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/audit_db
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-andesstay}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
       ANDESSTAY_KAFKA_REPLICAS: 3
 
@@ -111,7 +111,7 @@ services:
       SPRING_RABBITMQ_HOST: ${MQ_HOST}
       SPRING_RABBITMQ_PORT: ${MQ_PORT:-5672}
       SPRING_RABBITMQ_USERNAME: ${MQ_USER:-andesstay}
-      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD}
+      SPRING_RABBITMQ_PASSWORD: ${MQ_PASSWORD:?define MQ_PASSWORD en .env}
       # API de la Management UI: privada para el micro, pública para el botón del front
       RABBIT_MANAGEMENT_URL: http://${MQ_HOST}:15672
       RABBIT_MANAGEMENT_PUBLIC_URL: ${MQ_PUBLIC_URL:-http://localhost:15672}
