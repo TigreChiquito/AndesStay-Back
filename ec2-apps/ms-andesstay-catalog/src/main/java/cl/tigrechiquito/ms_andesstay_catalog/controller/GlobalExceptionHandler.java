@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import cl.tigrechiquito.ms_andesstay_catalog.domain.NoAvailabilityException;
+import cl.tigrechiquito.ms_andesstay_catalog.domain.SlotsInUseException;
 import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitInactiveException;
 import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitNotFoundException;
 
@@ -27,6 +28,12 @@ public class GlobalExceptionHandler {
     /** Sin cupos disponibles -> 409 Conflict. */
     @ExceptionHandler(NoAvailabilityException.class)
     public ProblemDetail handleNoAvailability(NoAvailabilityException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    /** Cupo total menor que los cupos ocupados -> 409 Conflict. */
+    @ExceptionHandler(SlotsInUseException.class)
+    public ProblemDetail handleSlotsInUse(SlotsInUseException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 

@@ -193,8 +193,14 @@ public class Unit {
     /**
      * Ajusta el cupo total (ej. la unidad amplía capacidad). Mantiene coherente
      * la disponibilidad: si sube el total, se suman esos cupos a los disponibles.
+     *
+     * @throws SlotsInUseException si el nuevo total es menor que los cupos ocupados.
      */
     public void adjustTotalSlots(int newTotal) {
+        int occupied = this.totalSlots - this.availableSlots;
+        if (newTotal < occupied) {
+            throw new SlotsInUseException(occupied);
+        }
         int delta = newTotal - this.totalSlots;
         this.totalSlots = newTotal;
         this.availableSlots = Math.max(0, this.availableSlots + delta);
