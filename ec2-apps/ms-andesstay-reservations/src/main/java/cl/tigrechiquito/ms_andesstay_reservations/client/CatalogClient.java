@@ -1,5 +1,7 @@
 package cl.tigrechiquito.ms_andesstay_reservations.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -15,6 +17,8 @@ import org.springframework.web.client.RestClient;
 @Component
 public class CatalogClient {
 
+    private static final Logger log = LoggerFactory.getLogger(CatalogClient.class);
+
     private final RestClient restClient;
 
     public CatalogClient(RestClient.Builder builder,
@@ -27,9 +31,16 @@ public class CatalogClient {
         call(unitId, "reserve");
     }
 
-    /** Devuelve un cupo al pool. */
+    /**
+     * Devuelve un cupo al pool. Si la unidad ya no existe en catalog no hay cupo
+     * que devolver: se registra y se sigue, para no dejar la reserva atascada.
+     */
     public void releaseSlot(Long unitId) {
-        call(unitId, "release");
+        try {
+            call(unitId, "release");
+        } catch (UnitNotFoundInCatalogException ex) {
+            log.warn("La unidad {} no existe en catalog; no hay cupo que devolver", unitId);
+        }
     }
 
     private void call(Long unitId, String action) {
@@ -44,8 +55,7 @@ public class CatalogClient {
                 throw new UnitNotAvailableException(unitId);
             }
             if (code == 404) {
-                throw new IllegalArgumentException(
-                        "La unidad " + unitId + " no existe en el catálogo");
+                throw new UnitNotFoundInCatalogException(unitId);
             }
             throw ex;
         } catch (ResourceAccessException ex) {

@@ -69,7 +69,7 @@ public class UnitController {
         return UnitResponse.from(service.update(id, request));
     }
 
-    /** DELETE /api/units/{id} — elimina la unidad. */
+    /** DELETE /api/units/{id} — desactiva la unidad (borrado lógico). */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);

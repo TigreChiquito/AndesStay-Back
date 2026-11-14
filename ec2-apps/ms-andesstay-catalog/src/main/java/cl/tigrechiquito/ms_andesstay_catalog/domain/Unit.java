@@ -95,9 +95,13 @@ public class Unit {
     /**
      * Descuenta un cupo (al confirmar una reserva).
      *
+     * @throws UnitInactiveException si la unidad está desactivada.
      * @throws NoAvailabilityException si no quedan cupos disponibles.
      */
     public void reserveOne() {
+        if (!active) {
+            throw new UnitInactiveException(this.id);
+        }
         if (availableSlots <= 0) {
             throw new NoAvailabilityException(this.id);
         }

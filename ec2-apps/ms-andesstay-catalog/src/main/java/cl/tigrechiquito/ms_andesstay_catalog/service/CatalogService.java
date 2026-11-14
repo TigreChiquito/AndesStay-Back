@@ -65,10 +65,15 @@ public class CatalogService {
         return repository.save(unit);
     }
 
+    /**
+     * Borrado lógico: la unidad queda inactiva (no reservable) pero la fila se
+     * conserva, para que las reservas en curso puedan devolver su cupo al hacer checkout.
+     */
     @Transactional
     public void delete(Long id) {
         Unit unit = getById(id); // 404 si no existe
-        repository.delete(unit);
+        unit.setActive(false);
+        repository.save(unit);
     }
 
     /** Descuenta un cupo. Lo llama reservations al CONFIRMAR una reserva. */

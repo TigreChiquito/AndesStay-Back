@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import cl.tigrechiquito.ms_andesstay_catalog.domain.NoAvailabilityException;
+import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitInactiveException;
 import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitNotFoundException;
 
 @RestControllerAdvice
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
     /** Sin cupos disponibles -> 409 Conflict. */
     @ExceptionHandler(NoAvailabilityException.class)
     public ProblemDetail handleNoAvailability(NoAvailabilityException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    /** Unidad desactivada: no acepta reservas -> 409 Conflict. */
+    @ExceptionHandler(UnitInactiveException.class)
+    public ProblemDetail handleInactive(UnitInactiveException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
