@@ -1,5 +1,6 @@
 package cl.tigrechiquito.ms_andesstay_rabbit_admin.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -38,5 +39,17 @@ public record CreateQueueRequest(
     // Boolean (no boolean): con Jackson 3 un primitivo ausente en el JSON es un error
     public boolean isWithDlq() {
         return Boolean.TRUE.equals(withDlq);
+    }
+
+    /** Sin DLQ, reject-publish-dlx no tiene a dónde mandar los rechazados y se pierden. */
+    @AssertTrue(message = "reject-publish-dlx necesita la DLQ: marca withDlq o elige otro overflow")
+    public boolean isOverflowDlxWithDlq() {
+        return !"reject-publish-dlx".equals(overflow) || isWithDlq();
+    }
+
+    /** overflow solo actúa cuando la cola se llena, y eso requiere un largo máximo. */
+    @AssertTrue(message = "overflow necesita maxLength: sin largo máximo la cola nunca se llena")
+    public boolean isOverflowWithMaxLength() {
+        return overflow == null || maxLength != null;
     }
 }

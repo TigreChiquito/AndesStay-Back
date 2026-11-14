@@ -58,6 +58,21 @@ class RequestValidationTest {
     }
 
     @Test
+    void rejectPublishDlxSinDlqEsInvalido() {
+        assertThat(invalidFields(new CreateQueueRequest("t1", null, false, null, 10, "reject-publish-dlx")))
+                .containsExactly("overflowDlxWithDlq");
+        assertThat(invalidFields(new CreateQueueRequest("t1", null, true, null, 10, "reject-publish-dlx")))
+                .isEmpty();
+    }
+
+    @Test
+    void overflowSinMaxLengthEsInvalido() {
+        assertThat(invalidFields(new CreateQueueRequest("t1", null, false, null, null, "reject-publish")))
+                .containsExactly("overflowWithMaxLength");
+        assertThat(invalidFields(new CreateQueueRequest("t1", null, false, null, null, null))).isEmpty();
+    }
+
+    @Test
     void exchangeConTipoInvalido() {
         assertThat(invalidFields(new CreateExchangeRequest("ex.demo", "headers", null))).contains("type");
         assertThat(invalidFields(new CreateExchangeRequest("ex.demo", "", null))).contains("type");
