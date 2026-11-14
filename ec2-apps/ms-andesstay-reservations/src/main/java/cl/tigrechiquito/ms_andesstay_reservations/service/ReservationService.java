@@ -2,11 +2,14 @@ package cl.tigrechiquito.ms_andesstay_reservations.service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -161,30 +164,34 @@ public class ReservationService {
     }
 
     /**
-     * Búsqueda con filtros opcionales. Si {@code guestId} no es nulo, solo
+     * Búsqueda con filtros opcionales e independientes: {@code from}/{@code to}
+     * acotan la fecha de llegada y {@code checkOutFrom}/{@code checkOutTo} la de
+     * salida (ambos extremos inclusive). Si {@code guestId} no es nulo, solo
      * devuelve reservas de ese huésped (lo usa el controller para quien no es personal).
      */
     @Transactional(readOnly = true)
-    public List<Reservation> search(ReservationStatus status, LocalDate from, LocalDate to, String guestId) {
-        boolean hasRange = (from != null && to != null);
-
+    public List<Reservation> search(ReservationStatus status, LocalDate from, LocalDate to,
+                                    LocalDate checkOutFrom, LocalDate checkOutTo, String guestId) {
+        List<Specification<Reservation>> filters = new ArrayList<>();
         if (guestId != null) {
-            return findByGuest(guestId).stream()
-                    .filter(r -> status == null || r.getStatus() == status)
-                    .filter(r -> !hasRange || (!r.getCheckInDate().isBefore(from) && !r.getCheckInDate().isAfter(to)))
-                    .toList();
-        }
-
-        if (status != null && hasRange) {
-            return repository.findByStatusAndCheckInDateBetween(status, from, to);
+            filters.add((r, q, cb) -> cb.equal(r.get("guestId"), guestId));
         }
         if (status != null) {
-            return repository.findByStatus(status);
+            filters.add((r, q, cb) -> cb.equal(r.get("status"), status));
         }
-        if (hasRange) {
-            return repository.findByCheckInDateBetween(from, to);
+        if (from != null) {
+            filters.add((r, q, cb) -> cb.greaterThanOrEqualTo(r.get("checkInDate"), from));
         }
-        return repository.findAll();
+        if (to != null) {
+            filters.add((r, q, cb) -> cb.lessThanOrEqualTo(r.get("checkInDate"), to));
+        }
+        if (checkOutFrom != null) {
+            filters.add((r, q, cb) -> cb.greaterThanOrEqualTo(r.get("checkOutDate"), checkOutFrom));
+        }
+        if (checkOutTo != null) {
+            filters.add((r, q, cb) -> cb.lessThanOrEqualTo(r.get("checkOutDate"), checkOutTo));
+        }
+        return repository.findAll(Specification.allOf(filters), Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     /** El cupo se devuelve al cancelar una reserva ya confirmada o al hacer checkout. */

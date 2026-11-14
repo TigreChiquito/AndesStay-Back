@@ -1,28 +1,23 @@
 package cl.tigrechiquito.ms_andesstay_reservations.repository;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
-import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import jakarta.persistence.LockModeType;
 
 /**
- * Acceso a datos de reservas.
- *
- * Las queries derivadas de abajo cubren el endpoint de la pauta:
- *   GET /api/reservations?status=...&from=...&to=...
- *
- * Cuando los filtros sean todos opcionales conviene migrar a Specifications
- * o a una @Query con parámetros nulos; por ahora, derivadas alcanzan.
+ * Acceso a datos de reservas. Los filtros opcionales de
+ * GET /api/reservations se arman con Specifications (ver ReservationService.search).
  */
-public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+public interface ReservationRepository extends JpaRepository<Reservation, Long>,
+        JpaSpecificationExecutor<Reservation> {
 
     /**
      * Lee la reserva bloqueando la fila (SELECT ... FOR UPDATE) hasta el fin de la
@@ -34,11 +29,4 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Optional<Reservation> findByIdForUpdate(@Param("id") Long id);
 
     List<Reservation> findByGuestIdOrderByCreatedAtDesc(String guestId);
-
-    List<Reservation> findByStatus(ReservationStatus status);
-
-    List<Reservation> findByCheckInDateBetween(LocalDate from, LocalDate to);
-
-    List<Reservation> findByStatusAndCheckInDateBetween(
-            ReservationStatus status, LocalDate from, LocalDate to);
 }

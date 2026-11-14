@@ -104,7 +104,9 @@ public class ReservationController {
     }
 
     /**
-     * GET /api/reservations?status=...&from=...&to=... — todos los filtros opcionales.
+     * GET /api/reservations?status=...&from=...&to=...&checkOutFrom=...&checkOutTo=...
+     * Todos los filtros son opcionales e independientes (fechas YYYY-MM-DD, inclusive):
+     * from/to acotan la llegada y checkOutFrom/checkOutTo la salida.
      * El personal (y Auditor) ve todas; el resto, solo las suyas.
      */
     @GetMapping
@@ -112,6 +114,8 @@ public class ReservationController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOutFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOutTo,
             @RequestHeader(value = "X-User-Id", required = false) String userId,
             @RequestHeader(value = "X-User-Roles", required = false) String roles) {
 
@@ -121,7 +125,7 @@ public class ReservationController {
                 ? null
                 : ReservationStatus.fromJson(status); // mismo parseo tolerante que el body
 
-        return service.search(parsedStatus, from, to, guestFilter).stream()
+        return service.search(parsedStatus, from, to, checkOutFrom, checkOutTo, guestFilter).stream()
                 .map(ReservationResponse::from)
                 .toList();
     }

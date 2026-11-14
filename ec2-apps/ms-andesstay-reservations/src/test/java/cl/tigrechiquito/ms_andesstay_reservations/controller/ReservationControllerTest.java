@@ -1,6 +1,13 @@
 package cl.tigrechiquito.ms_andesstay_reservations.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,13 +17,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -30,6 +42,10 @@ import cl.tigrechiquito.ms_andesstay_reservations.domain.Reservation;
 import cl.tigrechiquito.ms_andesstay_reservations.domain.ReservationStatus;
 import cl.tigrechiquito.ms_andesstay_reservations.repository.ReservationRepository;
 import cl.tigrechiquito.ms_andesstay_reservations.service.ReservationService;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 
 /**
  * Controller + service reales; repositorio y catalog simulados (los tests no
@@ -76,27 +92,68 @@ class ReservationControllerTest {
                 """.formatted(guestId, unitId, in, in.plusDays(2));
     }
 
+    @SuppressWarnings("unchecked")
+    static Specification<Reservation> anySpec() {
+        return any(Specification.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Specification<Reservation> lastSearchSpec() {
+        ArgumentCaptor<Specification<Reservation>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).findAll(captor.capture(), any(Sort.class));
+        return captor.getValue();
+    }
+
+    /**
+     * Evalúa una Specification contra un CriteriaBuilder simulado para ver qué
+     * predicados arma (sin base de datos). Cada atributo tiene su propio Path.
+     */
+    static final class SpecProbe {
+        final CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        final Map<String, Path<?>> paths = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        static SpecProbe of(Specification<Reservation> spec) {
+            SpecProbe probe = new SpecProbe();
+            Root<Reservation> root = mock(Root.class);
+            when(root.get(anyString())).thenAnswer(inv -> probe.path(inv.getArgument(0)));
+            spec.toPredicate(root, mock(CriteriaQuery.class), probe.cb);
+            return probe;
+        }
+
+        @SuppressWarnings("unchecked")
+        <T> Path<T> path(String attribute) {
+            return (Path<T>) paths.computeIfAbsent(attribute, a -> mock(Path.class));
+        }
+    }
+
     // ---------- P0-1: visibilidad de reservas ----------
 
     @Test
     void clienteSoloVeSusReservasEnElListado() throws Exception {
-        when(repository.findByGuestIdOrderByCreatedAtDesc("A")).thenReturn(List.of(reservation(1, "A")));
-        when(repository.findAll()).thenReturn(List.of(reservation(1, "A"), reservation(2, "B")));
+        when(repository.findAll(anySpec(), any(Sort.class))).thenReturn(List.of(reservation(1, "A")));
 
         mvc.perform(get("/api/reservations").header("X-User-Id", "A").header("X-User-Roles", "Cliente"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].guestId").value("A"));
+
+        SpecProbe probe = SpecProbe.of(lastSearchSpec());
+        verify(probe.cb).equal(probe.<String>path("guestId"), "A");
     }
 
     @Test
     void personalVeTodasLasReservasEnElListado() throws Exception {
-        when(repository.findAll()).thenReturn(List.of(reservation(1, "A"), reservation(2, "B")));
+        when(repository.findAll(anySpec(), any(Sort.class)))
+                .thenReturn(List.of(reservation(1, "A"), reservation(2, "B")));
 
         for (String role : List.of("Recepcionista", "Admin", "Auditor")) {
             mvc.perform(get("/api/reservations").header("X-User-Id", "staff").header("X-User-Roles", role))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(2));
+
+            assertThat(SpecProbe.of(lastSearchSpec()).paths).doesNotContainKey("guestId");
+            clearInvocations(repository);
         }
     }
 
@@ -147,8 +204,6 @@ class ReservationControllerTest {
 
     @Test
     void listadoSinUsuarioNiRolDePersonalResponde401() throws Exception {
-        when(repository.findByGuestIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
-
         mvc.perform(get("/api/reservations"))
                 .andExpect(status().isUnauthorized());
     }
@@ -258,5 +313,48 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.allowedTransitions").isEmpty())
                 .andExpect(jsonPath("$.nextStatus").isEmpty())
                 .andExpect(jsonPath("$.cancellable").value(false));
+    }
+
+    // ---------- P2-2 / P1-6: filtros de fecha independientes ----------
+
+    @Test
+    void filtrosDeSalidaSinFiltrosDeLlegada() throws Exception {
+        mvc.perform(get("/api/reservations").header("X-User-Roles", "Recepcionista")
+                        .param("checkOutFrom", "2030-01-12").param("checkOutTo", "2030-01-12"))
+                .andExpect(status().isOk());
+
+        SpecProbe probe = SpecProbe.of(lastSearchSpec());
+        LocalDate day = LocalDate.of(2030, 1, 12);
+        verify(probe.cb).greaterThanOrEqualTo(probe.path("checkOutDate"), day);
+        verify(probe.cb).lessThanOrEqualTo(probe.path("checkOutDate"), day);
+        assertThat(probe.paths).doesNotContainKey("checkInDate");
+    }
+
+    @Test
+    void fromSinToFiltraIgual() throws Exception {
+        mvc.perform(get("/api/reservations").header("X-User-Roles", "Admin").param("from", "2030-01-10"))
+                .andExpect(status().isOk());
+
+        SpecProbe probe = SpecProbe.of(lastSearchSpec());
+        verify(probe.cb).greaterThanOrEqualTo(probe.path("checkInDate"), LocalDate.of(2030, 1, 10));
+        verify(probe.cb, never()).lessThanOrEqualTo(eq(probe.path("checkInDate")), any(LocalDate.class));
+    }
+
+    @Test
+    void toSinFromFiltraIgual() throws Exception {
+        mvc.perform(get("/api/reservations").header("X-User-Roles", "Admin").param("to", "2030-01-10"))
+                .andExpect(status().isOk());
+
+        SpecProbe probe = SpecProbe.of(lastSearchSpec());
+        verify(probe.cb).lessThanOrEqualTo(probe.path("checkInDate"), LocalDate.of(2030, 1, 10));
+        verify(probe.cb, never()).greaterThanOrEqualTo(eq(probe.path("checkInDate")), any(LocalDate.class));
+    }
+
+    @Test
+    void sinFiltrosNoArmaPredicados() throws Exception {
+        mvc.perform(get("/api/reservations").header("X-User-Roles", "Admin"))
+                .andExpect(status().isOk());
+
+        assertThat(SpecProbe.of(lastSearchSpec()).paths).isEmpty();
     }
 }
