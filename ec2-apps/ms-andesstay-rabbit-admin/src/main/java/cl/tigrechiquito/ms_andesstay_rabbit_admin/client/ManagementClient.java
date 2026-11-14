@@ -3,6 +3,8 @@ package cl.tigrechiquito.ms_andesstay_rabbit_admin.client;
 import java.net.URI;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -24,6 +26,7 @@ import cl.tigrechiquito.ms_andesstay_rabbit_admin.domain.ManagementUnavailableEx
 @Component
 public class ManagementClient {
 
+    private static final Logger log = LoggerFactory.getLogger(ManagementClient.class);
     private static final int TIMEOUT_MS = 5000;
     private static final String VHOST = "%2F";
 
@@ -64,8 +67,10 @@ public class ManagementClient {
             List<T> body = restClient.get().uri(URI.create(baseUrl + path)).retrieve().body(type);
             return body != null ? body : List.of();
         } catch (RestClientException ex) {
+            // La URL (IP privada) y la causa van al log, no a la respuesta.
+            log.warn("No se pudo consultar la Management UI en {}{}", baseUrl, path, ex);
             throw new ManagementUnavailableException(
-                    "No se pudo consultar la Management UI de RabbitMQ (" + baseUrl + "): " + ex.getMessage(), ex);
+                    "No se pudo consultar la Management UI de RabbitMQ. Intenta de nuevo en unos minutos.", ex);
         }
     }
 }

@@ -3,6 +3,8 @@ package cl.tigrechiquito.ms_andesstay_rabbit_admin.controller;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpConnectException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -18,6 +20,8 @@ import cl.tigrechiquito.ms_andesstay_rabbit_admin.domain.ResourceNotFoundExcepti
 /** Traduce los errores a ProblemDetail (RFC 7807) con mensajes claros. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /** Validación de los DTOs: responde qué campo falló y por qué. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -62,7 +66,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AmqpConnectException.class)
     public ProblemDetail handleBrokerDown(AmqpConnectException ex) {
+        // La causa puede incluir el host del broker (IP privada): solo al log.
+        log.warn("No se pudo conectar a RabbitMQ por AMQP", ex);
         return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
-                "No se pudo conectar a RabbitMQ por AMQP: " + ex.getMessage());
+                "No se pudo conectar a RabbitMQ. Intenta de nuevo en unos minutos.");
     }
 }
