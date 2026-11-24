@@ -15,6 +15,7 @@ RabbitMQ y Kafka **no** viven aquí: están en [ec2-mq](../ec2-mq/README.md) y [
 | [`ms-andesstay-report/`](ms-andesstay-report/README.md) | Read model de KPIs (consumidor Kafka) |
 | [`ms-andesstay-audit/`](ms-andesstay-audit/README.md) | Historial de auditoría (consumidor Kafka) |
 | [`ms-andesstay-rabbit-admin/`](ms-andesstay-rabbit-admin/README.md) | Administrador de RabbitMQ (topología y métricas) |
+| [`ms-andesstay-kafka-admin/`](ms-andesstay-kafka-admin/README.md) | Administrador de Kafka (tópicos, configuraciones y consumer groups) |
 | [`postgres-init/`](postgres-init/README.md) | SQL que crea las bases al inicializar Postgres |
 | [`sql/`](sql/README.md) | Scripts de datos de prueba |
 | `compose.yml` | Orquestación de la máquina |
@@ -33,7 +34,8 @@ Cada micro es un proyecto Maven **autocontenido**, sin módulo padre: tiene su p
 | `report` | `andesstay-report` | 8084 (interno) | postgres, ec2-kafka |
 | `audit` | `andesstay-audit` | 8085 (interno) | postgres, ec2-kafka |
 | `rabbit-admin` | `andesstay-rabbit-admin` | 8086 (interno) | ec2-mq (AMQP 5672 y Management API 15672) |
-| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit, notify, rabbit-admin |
+| `kafka-admin` | `andesstay-kafka-admin` | 8087 (interno) | ec2-kafka (9092-9094) |
+| `bff` | `andesstay-bff` | **8080 publicado** | reservations, catalog, report, audit, notify, rabbit-admin, kafka-admin |
 
 Solo el BFF publica un puerto en el host: lo consume el AWS API Gateway. Los demás solo son accesibles dentro de la red de Docker, por nombre de servicio.
 

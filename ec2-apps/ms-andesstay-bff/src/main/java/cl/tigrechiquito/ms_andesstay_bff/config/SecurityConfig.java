@@ -71,6 +71,8 @@ public class SecurityConfig {
 
                         // administrador de RabbitMQ: solo Admin
                         .requestMatchers("/api/admin/**").hasRole("Admin")
+                        // administrador de Kafka: solo Admin
+                        .requestMatchers("/api/kafka/**").hasRole("Admin")
 
                         // audit: solo lectura Auditor (o Admin)
                         .requestMatchers("/api/audit/**").hasAnyRole("Auditor", "Admin")

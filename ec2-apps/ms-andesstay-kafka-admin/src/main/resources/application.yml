@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: ms-andesstay-kafka-admin
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    admin:
+      properties:
+        # Si Kafka no responde, cortar rápido (por defecto espera 60 s y el
+        # API Gateway corta a los 30 s con 503).
+        request.timeout.ms: 5000
+        default.api.timeout.ms: 10000
+
+server:
+  port: 8087
+
+kafka-admin:
+  # Tópicos del sistema: se pueden ver y ajustar su configuración, pero no
+  # eliminar ni cambiarles las particiones (rompería el orden por clave).
+  # "_" cubre los internos de Kafka (__consumer_offsets, __transaction_state...).
+  protected-prefixes: reservations.,units.,_
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

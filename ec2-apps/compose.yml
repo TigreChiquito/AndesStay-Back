@@ -118,6 +118,13 @@ services:
       RABBIT_MANAGEMENT_URL: http://${MQ_HOST}:15672
       RABBIT_MANAGEMENT_PUBLIC_URL: ${MQ_PUBLIC_URL:-http://localhost:15672}
 
+  kafka-admin:
+    build: ./ms-andesstay-kafka-admin
+    container_name: andesstay-kafka-admin
+    restart: unless-stopped
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP}
+
   bff:
     build: ./ms-andesstay-bff
     container_name: andesstay-bff
@@ -129,6 +136,7 @@ services:
       - audit
       - notify
       - rabbit-admin
+      - kafka-admin
     ports:
       - "8080:8080"     # UNICA puerta publica (la consume el AWS API Gateway)
     environment:
@@ -142,6 +150,7 @@ services:
       GATEWAY_ROUTES_NOTIFICATIONS: http://notify:8083
       GATEWAY_ROUTES_VOUCHERS: http://notify:8083
       GATEWAY_ROUTES_ADMIN: http://rabbit-admin:8086
+      GATEWAY_ROUTES_KAFKA: http://kafka-admin:8087
 
 volumes:
   andesstay_pgdata:

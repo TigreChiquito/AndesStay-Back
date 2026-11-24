@@ -20,7 +20,8 @@ Backend de **AndesStay**, una plataforma de reservas de hospedaje (hostales, cab
 │        ├──▶ report       :8084                            │
 │        ├──▶ audit        :8085                            │
 │        ├──▶ notify       :8083 (avisos; consume RabbitMQ) │
-│        └──▶ rabbit-admin :8086 (solo Admin; administra MQ)│
+│        ├──▶ rabbit-admin :8086 (solo Admin; administra MQ)│
+│        └──▶ kafka-admin  :8087 (solo Admin; tópicos/grupos)│
 │                                                           │
 │  Postgres :5432                                           │
 └──────────────┬──────────────────────────┬─────────────────┘
@@ -50,6 +51,7 @@ El sistema sigue un estilo **orientado a eventos**:
 | [`ec2-apps/ms-andesstay-report/`](ec2-apps/ms-andesstay-report/README.md) | EC2 #1 | Read model de KPIs alimentado por Kafka (CQRS) | [ver](ec2-apps/ms-andesstay-report/README.md) |
 | [`ec2-apps/ms-andesstay-audit/`](ec2-apps/ms-andesstay-audit/README.md) | EC2 #1 | Historial append-only alimentado por Kafka | [ver](ec2-apps/ms-andesstay-audit/README.md) |
 | [`ec2-apps/ms-andesstay-rabbit-admin/`](ec2-apps/ms-andesstay-rabbit-admin/README.md) | EC2 #1 | Administrador de RabbitMQ: crear/eliminar topología y métricas | [ver](ec2-apps/ms-andesstay-rabbit-admin/README.md) |
+| [`ec2-apps/ms-andesstay-kafka-admin/`](ec2-apps/ms-andesstay-kafka-admin/README.md) | EC2 #1 | Administrador de Kafka: tópicos, configuraciones y consumer groups | [ver](ec2-apps/ms-andesstay-kafka-admin/README.md) |
 | [`ec2-apps/postgres-init/`](ec2-apps/postgres-init/README.md) | EC2 #1 | Script que crea las bases al iniciar Postgres | [ver](ec2-apps/postgres-init/README.md) |
 | [`ec2-apps/sql/`](ec2-apps/sql/README.md) | EC2 #1 | Datos de prueba (seed) | [ver](ec2-apps/sql/README.md) |
 | [`ec2-mq/`](ec2-mq/README.md) | EC2 #2 | Clúster RabbitMQ de 2 nodos | [ver](ec2-mq/README.md) |
@@ -68,6 +70,7 @@ El sistema sigue un estilo **orientado a eventos**:
 | `ms-andesstay-report` | 8084 | `report_db` | Consumidor Kafka → KPIs |
 | `ms-andesstay-audit` | 8085 | `audit_db` | Consumidor Kafka → línea de tiempo |
 | `ms-andesstay-rabbit-admin` | 8086 | — | Crear/eliminar colas, exchanges y bindings (RabbitAdmin) y métricas del clúster |
+| `ms-andesstay-kafka-admin` | 8087 | — | Crear/modificar/eliminar tópicos y su configuración, lag y reset de offsets de los consumer groups (AdminClient) |
 
 Dentro de ec2-apps solo el BFF publica su puerto (8080). Los demás se comunican por la red interna de Docker usando el nombre del servicio (`http://reservations:8081`, etc.).
 

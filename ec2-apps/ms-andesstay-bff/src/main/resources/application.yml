@@ -26,6 +26,7 @@ gateway:
     notifications: http://localhost:8083
     vouchers: http://localhost:8083
     admin: http://localhost:8086
+    kafka: http://localhost:8087
 
 management:
   endpoints:
