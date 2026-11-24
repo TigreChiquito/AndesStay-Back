@@ -32,11 +32,18 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
       acks: all                          # durabilidad: espera confirmacion de las replicas
+      # Tuning: agrupa y comprime (menos viajes de red) a cambio de ~10 ms de latencia
+      batch-size: 32KB
+      compression-type: lz4
       properties:
         spring.json.add.type.headers: false   # no acoplar por clase entre servicios
+        enable.idempotence: true         # los reintentos del productor no duplican mensajes
+        linger.ms: 10
         # Si Kafka no responde, send() bloquea esperando metadatos (60s por defecto)
         # y el API Gateway corta a los 30s con 503. Se acota para no colgar el request.
         max.block.ms: 5000
+    admin:
+      modify-topic-configs: true         # aplica retención/cleanup a tópicos ya creados
 
   # Timeouts del RestClient autoconfigurado (lo usa CatalogClient): si catalog
   # no responde, se corta rapido con 503 en vez de colgar el request.
