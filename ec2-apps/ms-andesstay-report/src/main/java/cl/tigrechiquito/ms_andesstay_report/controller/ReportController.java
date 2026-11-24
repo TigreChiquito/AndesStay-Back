@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import cl.tigrechiquito.ms_andesstay_report.dto.ReportSummaryResponse;
 import cl.tigrechiquito.ms_andesstay_report.dto.UnitCountResponse;
+import cl.tigrechiquito.ms_andesstay_report.dto.UnitOccupancyResponse;
 import cl.tigrechiquito.ms_andesstay_report.service.ReportService;
 
 /**
@@ -40,5 +41,11 @@ public class ReportController {
     @GetMapping("/by-unit")
     public List<UnitCountResponse> byUnit() {
         return service.byUnit();
+    }
+
+    /** GET /api/reports/occupancy — ocupación actual por unidad (inventario vía units.state). */
+    @GetMapping("/occupancy")
+    public List<UnitOccupancyResponse> occupancy() {
+        return service.occupancy();
     }
 }

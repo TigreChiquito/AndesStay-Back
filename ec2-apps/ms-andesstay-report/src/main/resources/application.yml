@@ -32,6 +32,10 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+    listener:
+      concurrency: 3                     # un hilo por partición (los tópicos tienen 3)
+    admin:
+      modify-topic-configs: true
 
 server:
   port: 8084

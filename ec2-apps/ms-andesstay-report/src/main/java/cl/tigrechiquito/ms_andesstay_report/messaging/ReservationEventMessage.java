@@ -19,4 +19,12 @@ public record ReservationEventMessage(
         LocalDate checkOutDate,
         String status
 ) {
+
+    /** Sin estos campos el evento no se puede aplicar: va directo a la DLT, sin reintentos. */
+    public void validate() {
+        if (reservationId == null || status == null || timestamp == null) {
+            throw new IllegalArgumentException(
+                    "Evento de reserva incompleto: reservationId, status y timestamp son obligatorios");
+        }
+    }
 }

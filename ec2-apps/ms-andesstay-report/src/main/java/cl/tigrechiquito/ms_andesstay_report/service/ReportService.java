@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import cl.tigrechiquito.ms_andesstay_report.dto.ReportSummaryResponse;
 import cl.tigrechiquito.ms_andesstay_report.dto.UnitCountResponse;
+import cl.tigrechiquito.ms_andesstay_report.dto.UnitOccupancyResponse;
 import cl.tigrechiquito.ms_andesstay_report.repository.ReservationProjectionRepository;
+import cl.tigrechiquito.ms_andesstay_report.repository.UnitStateRepository;
 
 @Service
 public class ReportService {
@@ -17,9 +19,11 @@ public class ReportService {
     private static final String STATUS_EN_ESTADIA = "EN_ESTADIA";
 
     private final ReservationProjectionRepository repository;
+    private final UnitStateRepository units;
 
-    public ReportService(ReservationProjectionRepository repository) {
+    public ReportService(ReservationProjectionRepository repository, UnitStateRepository units) {
         this.repository = repository;
+        this.units = units;
     }
 
     @Transactional(readOnly = true)
@@ -42,6 +46,18 @@ public class ReportService {
     public List<UnitCountResponse> byUnit() {
         return repository.countGroupedByUnit().stream()
                 .map(row -> new UnitCountResponse(row.getUnitId(), row.getTotal()))
+                .toList();
+    }
+
+    /** Ocupación actual por unidad, desde el inventario que llega por units.state. */
+    @Transactional(readOnly = true)
+    public List<UnitOccupancyResponse> occupancy() {
+        return units.findAll().stream()
+                .map(u -> new UnitOccupancyResponse(
+                        u.getUnitId(), u.getName(), u.getType(),
+                        u.getTotalSlots(), u.getAvailableSlots(),
+                        u.getTotalSlots() == 0 ? 0 : 1.0 - (double) u.getAvailableSlots() / u.getTotalSlots(),
+                        u.getPricePerNight(), u.isActive()))
                 .toList();
     }
 }
