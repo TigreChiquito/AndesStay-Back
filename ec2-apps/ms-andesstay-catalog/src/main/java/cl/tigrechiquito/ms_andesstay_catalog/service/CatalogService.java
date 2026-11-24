@@ -2,6 +2,7 @@ package cl.tigrechiquito.ms_andesstay_catalog.service;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,15 +11,25 @@ import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitNotFoundException;
 import cl.tigrechiquito.ms_andesstay_catalog.domain.UnitType;
 import cl.tigrechiquito.ms_andesstay_catalog.dto.CreateUnitRequest;
 import cl.tigrechiquito.ms_andesstay_catalog.dto.UpdateUnitRequest;
+import cl.tigrechiquito.ms_andesstay_catalog.messaging.UnitChangedEvent;
 import cl.tigrechiquito.ms_andesstay_catalog.repository.UnitRepository;
 
 @Service
 public class CatalogService {
 
     private final UnitRepository repository;
+    private final ApplicationEventPublisher events;
 
-    public CatalogService(UnitRepository repository) {
+    public CatalogService(UnitRepository repository, ApplicationEventPublisher events) {
         this.repository = repository;
+        this.events = events;
+    }
+
+    /** Guarda y avisa del cambio: UnitStatePublisher lo publica en units.state tras el commit. */
+    private Unit saveAndNotify(Unit unit) {
+        Unit saved = repository.save(unit);
+        events.publishEvent(new UnitChangedEvent(saved));
+        return saved;
     }
 
     @Transactional
@@ -29,7 +40,7 @@ public class CatalogService {
                 req.location(),
                 req.totalSlots(),
                 req.pricePerNight());
-        return repository.save(unit);
+        return saveAndNotify(unit);
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +73,7 @@ public class CatalogService {
         unit.setPricePerNight(req.pricePerNight());
         unit.setActive(req.active());
         unit.adjustTotalSlots(req.totalSlots()); // reajusta disponibilidad
-        return repository.save(unit);
+        return saveAndNotify(unit);
     }
 
     /**
@@ -73,7 +84,7 @@ public class CatalogService {
     public void delete(Long id) {
         Unit unit = getById(id); // 404 si no existe
         unit.setActive(false);
-        repository.save(unit);
+        saveAndNotify(unit);
     }
 
     /** Descuenta un cupo. Lo llama reservations al CONFIRMAR una reserva. */
@@ -81,7 +92,7 @@ public class CatalogService {
     public Unit reserveOne(Long id) {
         Unit unit = getById(id);
         unit.reserveOne(); // lanza NoAvailabilityException si no hay cupos
-        return repository.save(unit);
+        return saveAndNotify(unit);
     }
 
     /** Devuelve un cupo. Lo llama reservations al CANCELAR una reserva. */
@@ -89,6 +100,6 @@ public class CatalogService {
     public Unit releaseOne(Long id) {
         Unit unit = getById(id);
         unit.releaseOne();
-        return repository.save(unit);
+        return saveAndNotify(unit);
     }
 }

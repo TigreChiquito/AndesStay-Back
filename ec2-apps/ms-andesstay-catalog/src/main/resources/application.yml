@@ -16,6 +16,24 @@ spring:
         format_sql: true        # imprime el SQL ordenado y legible
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      batch-size: 32KB
+      compression-type: lz4
+      properties:
+        spring.json.add.type.headers: false
+        enable.idempotence: true
+        linger.ms: 10
+        # reservations llama a catalog con 5 s de timeout de lectura: si Kafka no
+        # responde, el envío no puede comerse ese margen.
+        max.block.ms: 1000
+    admin:
+      modify-topic-configs: true
+
 server:
   port: 8082
 
